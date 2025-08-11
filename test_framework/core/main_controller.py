@@ -13,7 +13,6 @@ from datetime import datetime
 from .config_manager import ConfigManager
 from .logger_manager import LoggerManager
 from ..checkers.environment_checker import EnvironmentChecker
-from ..checkers.config_validator import ConfigValidator
 from ..executors.task_executor import TaskExecutor
 from ..executors.flash_manager import FlashManager
 from ..executors.test_runner import TestRunner
@@ -46,7 +45,6 @@ class MainController:
         # 各功能模块
         self.canoe_interface: Optional[CANoeInterface] = None
         self.environment_checker: Optional[EnvironmentChecker] = None
-        self.config_validator: Optional[ConfigValidator] = None
         self.task_executor: Optional[TaskExecutor] = None
         self.flash_manager: Optional[FlashManager] = None
         self.test_runner: Optional[TestRunner] = None
@@ -93,23 +91,41 @@ class MainController:
         # 获取配置
         main_config = self.config_manager.load_main_config()
         
+        # 初始化服务 (NotificationService needs to be initialized before checkers)
+        self.notification_service = NotificationService(
+            email_config=main_config.get("email", {}),
+            wechat_config=main_config.get("wechat", {})
+        )
+        self.data_archiver = DataArchiver(main_config.get("archive", {}))
+        self.package_manager = PackageManager(main_config.get("package_manager", {}))
+
         # 初始化CANoe接口
         self.canoe_interface = CANoeInterface(main_config.get("canoe", {}))
         
         # 初始化检查器
-        self.environment_checker = EnvironmentChecker(self.canoe_interface)
-        self.config_validator = ConfigValidator(self.canoe_interface)
+        self.environment_checker = EnvironmentChecker(self.canoe_interface, self.notification_service)
         
         # 初始化执行器
         self.task_executor = TaskExecutor(self.config_manager)
         self.flash_manager = FlashManager(main_config.get("flash", {}))
         self.test_runner = TestRunner(self.canoe_interface)
-        
-        # 初始化服务
-        self.data_archiver = DataArchiver(main_config.get("archive", {}))
-        self.notification_service = NotificationService(main_config.get("email", {}))
-        self.package_manager = PackageManager(main_config.get("package_manager", {}))
     
+    def _execute_phase(self, phase_name: str, func, *args, **kwargs) -> bool:
+        """执行一个测试流程阶段"""
+        self.current_phase = phase_name
+        self.logger.info(f"开始 {phase_name}")
+        try:
+            if not func(*args, **kwargs):
+                self.logger.error(f"{phase_name} 失败")
+                self._handle_critical_error(f"{phase_name} 失败")
+                return False
+            self.logger.info(f"{phase_name} 完成")
+            return True
+        except Exception as e:
+            self.logger.error(f"{phase_name} 期间发生异常: {e}")
+            self._handle_critical_error(f"{phase_name} 期间发生异常: {e}")
+            return False
+
     def run(self) -> bool:
         """
         运行完整的测试流程
@@ -126,32 +142,19 @@ class MainController:
         try:
             self.logger.info("开始执行测试流程")
             
-            # 1. 配置文件验证
-            if not self._execute_config_validation():
+            if not self._execute_phase("配置文件验证", self._execute_config_validation):
                 return False
-                
-            # 2. 测试环境检查
-            if not self._execute_environment_check():
+            if not self._execute_phase("测试环境检查", self._execute_environment_check):
                 return False
-                
-            # 3. 读取任务配置
-            if not self._load_task_configuration():
+            if not self._execute_phase("读取任务配置", self._load_task_configuration):
                 return False
-                
-            # 4. 软件包管理（如需要）
-            if not self._manage_packages():
+            if not self._execute_phase("软件包管理", self._manage_packages):
                 return False
-                
-            # 5. 执行刷写操作（如需要）
-            if not self._execute_flash_operation():
+            if not self._execute_phase("执行刷写操作", self._execute_flash_operation):
                 return False
-                
-            # 6. 运行测试用例
-            if not self._execute_test_cases():
+            if not self._execute_phase("运行测试用例", self._execute_test_cases):
                 return False
-                
-            # 7. 归档数据和发送通知
-            if not self._finalize_execution():
+            if not self._execute_phase("数据归档和通知", self._finalize_execution):
                 return False
                 
             self.logger.info("测试流程执行完成")
@@ -166,29 +169,58 @@ class MainController:
     
     def _execute_config_validation(self) -> bool:
         """执行配置文件验证"""
-        self.current_phase = "配置验证"
-        self.logger.info("开始配置文件验证")
-        
-        # 实现配置验证逻辑
-        # 调用CAPL用例检查配置文件
-        return True
+        try:
+            self.config_manager.load_main_config()
+            self.config_manager.load_task_config()
+            self.logger.info("配置文件验证成功")
+            return True
+        except (FileNotFoundError, ValueError) as e:
+            self.logger.error(f"配置文件验证失败: {e}")
+            # No need to call _handle_critical_error here as it's handled by _execute_phase
+            return False
     
     def _execute_environment_check(self) -> bool:
         """执行测试环境检查"""
-        self.current_phase = "环境检查"
-        self.logger.info("开始测试环境检查")
-        
-        # 实现环境检查逻辑
-        # 调用CAPL用例检查环境状态
-        return True
+        try:
+            check_results = self.environment_checker.check_environment()
+            
+            if check_results.get('result') == 'fail':
+                error_msg = f"环境检查失败: {check_results.get('error_message', '未知错误')}"
+                self.logger.error(error_msg)
+                
+                # 发送通知
+                self.notification_service.send_email(
+                    subject="环境检查失败警告",
+                    content=error_msg
+                )
+                self.notification_service.send_robot_message(
+                    message=error_msg,
+                    level='error'
+                )
+                
+                return False
+            
+            self.logger.info("环境检查通过")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"环境检查期间发生异常: {str(e)}")
+            return False
     
     def _load_task_configuration(self) -> bool:
         """读取任务配置"""
-        self.current_phase = "任务配置"
-        self.logger.info("开始读取任务配置")
-        
-        # 实现任务配置读取逻辑
-        return True
+        try:
+            test_cases = self.task_executor.parse_task_config()
+            if not test_cases:
+                self.logger.error("未找到有效的测试用例")
+                return False
+            
+            self.logger.info(f"成功加载 {len(test_cases)} 个测试用例")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"读取任务配置失败: {str(e)}")
+            return False
     
     def _manage_packages(self) -> bool:
         """管理软件包"""
@@ -222,18 +254,26 @@ class MainController:
         # 实现数据归档和通知逻辑
         return True
     
-    def _handle_critical_error(self, error_message: str) -> None:
+    def _handle_critical_error(self, error_message: str, failed_keywords: set = None) -> None:
         """处理关键错误"""
         self.logger.error(f"发生关键错误: {error_message}")
         
         # 发送错误通知邮件
         if self.notification_service:
             error_info = {
-                "phase": self.current_phase,
-                "error": error_message,
-                "timestamp": datetime.now().isoformat()
+                "错误类型": "系统关键错误",
+                "错误信息": error_message,
+                "发生阶段": self.current_phase,
+                "时间戳": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
-            self.notification_service.send_error_notification(error_info)
+            self.notification_service.send_email(
+                subject=f"FAST测试框架关键错误: {self.current_phase}",
+                results=error_info,
+                failed_keywords=failed_keywords if failed_keywords else set()
+            )
+            self.notification_service.send_robot_message(
+                content=f"FAST测试框架发生关键错误！\n阶段: {self.current_phase}\n错误: {error_message}\n时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
     
     def stop(self) -> None:
         """

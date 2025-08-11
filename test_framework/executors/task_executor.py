@@ -38,8 +38,12 @@ class TaskExecutor:
         self.logger.info("开始解析任务配置")
         
         try:
-            # 加载任务配置
-            self.task_config = self.config_manager.load_task_config()
+            # The config is already loaded by main_controller
+            self.task_config = self.config_manager.task_config
+            if not self.task_config:
+                self.logger.error("任务配置未加载")
+                return []
+
             self.test_cases = self.task_config.get("test_cases", [])
             
             self.logger.info(f"解析到 {len(self.test_cases)} 个测试用例")

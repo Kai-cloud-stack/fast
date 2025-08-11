@@ -17,71 +17,43 @@ class EnvironmentChecker:
     验证必要的服务和资源是否可访问。
     """
     
-    def __init__(self, canoe_interface):
+    def __init__(self, canoe_interface, notification_service):
         """
         初始化环境检查器
         
         Args:
             canoe_interface: CANoe接口实例
+            notification_service: 通知服务实例
         """
         self.canoe_interface = canoe_interface
+        self.notification_service = notification_service
         self.logger = logging.getLogger(__name__)
         self.check_results: Dict[str, Any] = {}
     
-    def check_environment(self) -> bool:
+    def check_environment(self) -> Dict[str, Any]:
         """
-        检查测试环境
+        检查测试环境并返回结果.
         
         Returns:
-            bool: 环境检查是否通过
+            Dict[str, Any]: 环境检查的测试结果.
         """
         self.logger.info("开始环境检查")
         
         try:
-            from interface.canoe_interface import CANoeInterface
-            from utils.notification import send_email, send_robot_message
-            
-            # 初始化CANoe接口并加载配置
-            self.canoe_interface = CANoeInterface(
-                config_path=canoe_interface.canoe_config,
-                environment=canoe_interface.test_environment
-            )
-            
             # 启动CANoe并初始化连接
             self.canoe_interface.initialize()
             self.canoe_interface.start_measurement()
             self.canoe_interface.select_test_cases(['Check_Environment'])
             self.canoe_interface.run_test_modules()
             self.canoe_interface.stop_measurement()
-            test_results = self.canoe_interface.test_results
-            if test_results.get('result') == 'fail':
-                # 构建错误消息
-                error_msg = f"环境检查失败: {test_results.get('error_message', '未知错误')}"
-                
-                # 使用通知模板发送邮件
-                notification_template = {
-                    'subject': "环境检查失败警告",
-                    'content': error_msg,
-                    'type': 'email'
-                }
-                send_email(**notification_template)
-                
-                # 使用通知模板发送机器人消息
-                robot_template = {
-                    'message': error_msg,
-                    'type': 'robot'
-                }
-                send_robot_message(**robot_template)
-                # 中断程序运行
-                raise EnvironmentError(error_msg)
-
-            # 实现环境检查逻辑
-            # 调用CAPL用例进行环境检查
-            return True
+            self.check_results = self.canoe_interface.test_results
+            self.logger.info(f"环境检查完成: {self.check_results}")
+            return self.check_results
             
         except Exception as e:
-            self.logger.error(f"环境检查失败: {str(e)}")
-            return False
+            self.logger.error(f"环境检查期间发生异常: {str(e)}")
+            # 返回一个表示失败的字典
+            return {"result": "fail", "error_message": f"环境检查期间发生异常: {str(e)}"}
     
     def get_check_results(self) -> Dict[str, Any]:
         """获取检查结果"""
