@@ -1,0 +1,38 @@
+{
+    "canoe": {
+        "base_path": "E:\\A_File\\Basetech\\P181_ADC25_J_Common",
+        "configuration_path": "E:\\A_File\\Basetech\\P181_ADC25_J_Common\\P181_ADC25_J_v15.cfg",
+        "tse_path": "E:\\A_File\\Basetech\\P181_ADC25_J_Common\\05_TestModule\\Test Environments.tse",
+        "timeout": 30
+    },
+    "email": {
+        "recipient": "kai.ren@freetech.com"
+    },
+    "wechat": {
+        "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=4f415a3f-52ad-4295-9731-88adf44512d1",
+        "timeout": 10,
+        "retry_count": 3,
+        "default_mentioned_users": ["15903427830"],
+        "enable_notification": true
+    },
+    "logging": {
+        "level": "INFO",
+        "file_path": "./logs/test_framework.log",
+        "max_size": "10MB",
+        "backup_count": 5,
+        "console_output": true,
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "date_format": "%Y-%m-%d %H:%M:%S"
+    },
+    "archive": {
+        "base_path": "./archives",
+        "retention_days": 30
+    },
+    "package_manager": {
+        "repository_url": "https://packages.company.com",
+        "download_path": "./downloads",
+        "cache_path": "./cache",
+        "timeout": 300,
+        "auto_update": true
+    }
+}
