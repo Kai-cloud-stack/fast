@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 import pandas as pd
-from win32com.client import DispatchEx, WithEvents, DispatchWithEvents, CastTo
+from win32com.client import Dispatch, DispatchEx, WithEvents, DispatchWithEvents, CastTo
 from win32com.client.connect import *
 import pythoncom
 
@@ -88,6 +88,7 @@ class CANoeTestModule:
     def __init__(self, tm):
         self.tm = tm
         self.events = DispatchWithEvents(tm, CANoeTestEvents)
+        self.events.name = tm.Name
         self.name = tm.Name
         self.full_name = tm.FullName
         self.path = tm.Path
@@ -126,7 +127,7 @@ class CANoeTestEvents:
         self.started = False
         self.stopped = False
         self.report_generated = False
-        self.name = "Unknown"
+        self.name = ""
     
     def wait_for_start(self, timeout: float = 30.0) -> bool:
         """等待测试开始"""
@@ -306,7 +307,7 @@ class CANoeInterface:
         """
         try:
             # 尝试创建CANoe应用程序对象来检查环境
-            test_app = DispatchEx('CANoe.Application')
+            test_app = Dispatch('CANoe.Application')
             if test_app:
                 version = test_app.Version
                 self.logger.info(f"检测到CANoe版本: {version.major}.{version.minor}.{version.Build}")

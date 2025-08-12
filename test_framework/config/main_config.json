@@ -29,10 +29,50 @@
         "retention_days": 30
     },
     "package_manager": {
-        "repository_url": "https://packages.company.com",
+        "default_method": "windows_share",
         "download_path": "./downloads",
-        "cache_path": "./cache",
         "timeout": 300,
-        "auto_update": true
+        "windows_share": {
+            "enabled": true,
+            "sync_on_startup": true,
+            "connection_timeout": 30,
+            "read_timeout": 60,
+            "retry_attempts": 3,
+            "retry_delay": 1.0,
+            "max_concurrent_transfers": 5,
+            "chunk_size": 65536,
+            "verify_transfers": true,
+            "sync_packages": [
+                {
+                    "name": "firmware",
+                    "share_path": "//192.168.1.100/shared_packages/firmware",
+                    "local_path": "./downloads/firmware",
+                    "extensions": [".zip"],
+                    "filename_prefixes": ["vbf"],
+                    "max_size": "",
+                    "overwrite": true,
+                    "clear_destination": true
+                }
+            ]
+        },
+        "svn": {
+            "enabled": true,
+            "repository_type": "svn",
+            "repository_url": "",
+            "svn_path": "",
+            "svn_username": "",
+            "svn_password": "",
+            "test_packages": [
+                {
+                    "name": "test_firmware",
+                    "svn_url": "https://svn.example.com/repo/firmware",
+                    "local_path": "./downloads/svn_firmware",
+                    "svn_checkout": false,
+                    "revision": "HEAD",
+                    "depth": "infinity",
+                    "clear_destination": true
+                }
+            ]
+        }
     }
 }

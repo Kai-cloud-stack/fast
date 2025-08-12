@@ -226,8 +226,52 @@ class MainController:
         self.current_phase = "软件包管理"
         self.logger.info("开始软件包管理")
         
-        # 实现软件包管理逻辑
-        return True
+        try:
+            # 读取主配置中的 package_manager 配置
+            main_config = self.config_manager.load_main_config()
+            pm_cfg = main_config.get("package_manager", {}) if main_config else {}
+            ws_cfg = pm_cfg.get("windows_share", {}) if isinstance(pm_cfg, dict) else {}
+
+            # 若启用 windows 共享同步，则按配置执行
+            if ws_cfg.get("enabled"):
+                self.logger.info("检测到已启用 Windows 共享目录同步功能")
+
+                # 将并发/超时等参数覆盖到 package_manager 的运行时配置（如果有必要，可考虑在 PackageManager 内部接收）
+                # 这里主要是根据 sync_packages 列表进行具体包的同步
+                sync_on_startup = ws_cfg.get("sync_on_startup", True)
+                sync_packages = ws_cfg.get("sync_packages", [])
+
+                if sync_on_startup and sync_packages:
+                    for idx, pkg in enumerate(sync_packages, start=1):
+                        name = pkg.get("name", f"pkg_{idx}")
+                        share_path = pkg.get("share_path")
+                        local_path = pkg.get("local_path")
+                        if not share_path or not local_path:
+                            self.logger.warning(f"跳过无效的同步项: name={name}, 缺少 share_path 或 local_path")
+                            continue
+
+                        self.logger.info(f"[{idx}/{len(sync_packages)}] 同步软件包: {name}")
+                        try:
+                            # 复用 PackageManager.download_package 以统一入口（其内部会根据 share_path 走共享同步）
+                            download_path = self.package_manager.download_package(pkg)
+                            if not download_path:
+                                self.logger.error(f"软件包同步失败: {name}")
+                                return False
+                            self.logger.info(f"软件包同步完成: {name} -> {download_path}")
+                        except Exception as e:
+                            self.logger.error(f"软件包同步异常: {name}, 错误: {e}")
+                            return False
+                else:
+                    self.logger.info("windows_share.sync_on_startup 为 False 或未配置 sync_packages，跳过自动同步")
+            else:
+                self.logger.info("未启用 Windows 共享目录同步功能")
+
+            # 此处可扩展传统仓库的包下载逻辑，例如根据任务配置决定需要哪些包
+            # 当前保留为占位逻辑
+            return True
+        except Exception as e:
+            self.logger.error(f"软件包管理阶段出现异常: {e}")
+            return False
     
     def _execute_flash_operation(self) -> bool:
         """执行刷写操作"""

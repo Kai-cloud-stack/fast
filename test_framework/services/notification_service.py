@@ -94,3 +94,4 @@ class NotificationService:
             self.logger.info("WeChat message sent successfully.")
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Failed to send WeChat message: {e}")
+
