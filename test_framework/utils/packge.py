@@ -297,7 +297,7 @@ class FileDiscoveryService:
             file_info = FileInfo(
                 name=filename,
                 path=file_path,
-                size=stat_info.st_size,
+                size=int(stat_info.st_size),  # 确保大小是整数类型
                 modified_time=datetime.fromtimestamp(stat_info.st_mtime),
                 is_directory=os.path.isdir(file_path),
                 permissions=oct(stat_info.st_mode)[-3:]  # 获取权限的最后3位
@@ -338,7 +338,15 @@ class FileFilter:
                  filename_prefixes: Optional[List[str]] = None,
                  filename_suffixes: Optional[List[str]] = None):
         self.extensions = [ext.lower().lstrip('.') for ext in (extensions or [])]
-        self.max_size = max_size
+        # 确保 max_size 是整数类型或 None
+        if max_size is not None:
+            try:
+                self.max_size = int(max_size)
+            except (ValueError, TypeError):
+                logger.warning(f"无效的 max_size 值: {max_size}, 将忽略大小限制")
+                self.max_size = None
+        else:
+            self.max_size = None
         self.exclude_patterns = exclude_patterns or []
         self.include_directories = include_directories
         self.filename_prefixes = [prefix.lower() for prefix in (filename_prefixes or [])]
@@ -359,9 +367,17 @@ class FileFilter:
             return not self._matches_exclude_patterns(file_info.name, file_info.path)
 
         # 文件大小过滤
-        if self.max_size is not None and file_info.size > self.max_size:
-            logger.debug(f"文件 {file_info.name} 超过大小限制: {file_info.size} > {self.max_size}")
-            return False
+        if self.max_size is not None:
+            try:
+                # 确保文件大小和最大大小都是整数类型
+                file_size = int(file_info.size) if isinstance(file_info.size, str) else file_info.size
+                max_size = int(self.max_size) if isinstance(self.max_size, str) else self.max_size
+                if file_size > max_size:
+                    logger.debug(f"文件 {file_info.name} 超过大小限制: {file_size} > {max_size}")
+                    return False
+            except (ValueError, TypeError) as e:
+                logger.warning(f"文件大小比较失败 {file_info.name}: {e}, 跳过大小检查")
+                # 如果类型转换失败，跳过大小检查，继续其他过滤条件
 
         # 扩展名过滤
         if self.extensions:
@@ -504,11 +520,18 @@ class ProgressMonitor:
         transfer_speed = self.transferred_bytes / elapsed_time if elapsed_time > 0 else 0
 
         # 计算完成百分比
-        file_progress = (self.completed_files + self.failed_files + self.skipped_files) / self.total_files * 100 if self.total_files > 0 else 0
-        byte_progress = self.transferred_bytes / self.total_bytes * 100 if self.total_bytes > 0 else 0
+        try:
+            total_files = int(self.total_files) if not isinstance(self.total_files, int) else self.total_files
+            total_bytes = int(self.total_bytes) if not isinstance(self.total_bytes, int) else self.total_bytes
+        except (ValueError, TypeError):
+            total_files = 0
+            total_bytes = 0
+            
+        file_progress = (self.completed_files + self.failed_files + self.skipped_files) / total_files * 100 if total_files > 0 else 0
+        byte_progress = self.transferred_bytes / total_bytes * 100 if total_bytes > 0 else 0
 
         # 估算剩余时间
-        remaining_bytes = self.total_bytes - self.transferred_bytes
+        remaining_bytes = total_bytes - self.transferred_bytes
         estimated_time = remaining_bytes / transfer_speed if transfer_speed > 0 else 0
 
         return {
@@ -555,6 +578,12 @@ class ProgressMonitor:
 
     def _format_bytes(self, bytes_count: int) -> str:
         """格式化字节数显示"""
+        try:
+            # 确保 bytes_count 是数值类型
+            bytes_count = float(bytes_count) if not isinstance(bytes_count, (int, float)) else float(bytes_count)
+        except (ValueError, TypeError):
+            return "0 B"
+            
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
             if bytes_count < 1024.0:
                 return f"{bytes_count:.1f} {unit}"
@@ -1245,7 +1274,7 @@ class FileTransferService:
             return FileInfo(
                 name=filename,
                 path=file_path,
-                size=stat_info.st_size,
+                size=int(stat_info.st_size),  # 确保大小是整数类型
                 modified_time=datetime.fromtimestamp(stat_info.st_mtime),
                 is_directory=os.path.isdir(file_path)
             )
