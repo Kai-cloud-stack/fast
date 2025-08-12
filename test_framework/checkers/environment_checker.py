@@ -6,6 +6,7 @@ Environment Checker Module
 """
 
 import logging
+from ..utils.logging_system import get_logger
 from typing import Dict, Any, Optional
 
 
@@ -27,7 +28,7 @@ class EnvironmentChecker:
         """
         self.canoe_interface = canoe_interface
         self.notification_service = notification_service
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         self.check_results: Dict[str, Any] = {}
     
     def check_environment(self) -> Dict[str, Any]:

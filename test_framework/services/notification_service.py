@@ -1,11 +1,23 @@
 """
 Service for sending notifications like email and WeChat messages.
 """
-import win32com.client as win32
+import platform
 import requests
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Set, Optional
 from ..utils.logging_system import get_logger
 from .html_templates import generate_html_email
+
+# 条件导入Windows特有的模块
+if platform.system() == 'Windows':
+    try:
+        import win32com.client as win32
+        WIN32_AVAILABLE = True
+    except ImportError:
+        WIN32_AVAILABLE = False
+        win32 = None
+else:
+    WIN32_AVAILABLE = False
+    win32 = None
 
 class NotificationService:
     """

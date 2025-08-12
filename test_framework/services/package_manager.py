@@ -6,6 +6,7 @@ Package Manager Module
 """
 
 import logging
+from ..utils.logging_system import get_logger
 from typing import Dict, Any
 
 
@@ -24,7 +25,7 @@ class PackageManager:
             package_config: 软件包配置
         """
         self.package_config = package_config
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
     
     def download_package(self, package_info: Dict[str, Any]) -> str:
         """

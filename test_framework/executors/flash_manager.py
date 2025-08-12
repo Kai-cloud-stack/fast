@@ -6,6 +6,7 @@ Flash Manager Module
 """
 
 import logging
+from ..utils.logging_system import get_logger
 from typing import Dict, Any, Optional
 
 
@@ -26,7 +27,7 @@ class FlashManager:
         """
         self.flash_config = flash_config
         self.max_retries = max_retries
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         self.flash_status: Dict[str, Any] = {}
     
     def validate_flash_files(self) -> bool:

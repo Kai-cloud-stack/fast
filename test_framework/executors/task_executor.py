@@ -6,6 +6,7 @@ Task Executor Module
 """
 
 import logging
+from ..utils.logging_system import get_logger
 from typing import Dict, Any, List, Optional
 
 
@@ -24,7 +25,7 @@ class TaskExecutor:
             config_manager: 配置管理器实例
         """
         self.config_manager = config_manager
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         self.task_config: Optional[Dict[str, Any]] = None
         self.test_cases: List[Dict[str, Any]] = []
     

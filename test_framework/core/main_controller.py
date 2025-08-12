@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from .config_manager import ConfigManager
-from .logger_manager import LoggerManager
+from ..utils.logging_system import get_logger, setup_project_logging
 from ..checkers.environment_checker import EnvironmentChecker
 from ..executors.task_executor import TaskExecutor
 from ..executors.flash_manager import FlashManager
@@ -39,8 +39,7 @@ class MainController:
         """
         self.config_path = config_path
         self.config_manager: Optional[ConfigManager] = None
-        self.logger_manager: Optional[LoggerManager] = None
-        self.logger: Optional[logging.Logger] = None
+        self.logger = None
         
         # 各功能模块
         self.canoe_interface: Optional[CANoeInterface] = None
@@ -69,9 +68,9 @@ class MainController:
             # 初始化配置管理器
             self.config_manager = ConfigManager(self.config_path)
             
-            # 初始化日志管理器
-            self.logger_manager = LoggerManager(self.config_manager)
-            self.logger = self.logger_manager.get_logger("MainController")
+            # 初始化日志系统
+            setup_project_logging()
+            self.logger = get_logger("MainController")
             
             self.logger.info("开始初始化测试框架")
             

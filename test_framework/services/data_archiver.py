@@ -6,6 +6,7 @@ Data Archiver Module
 """
 
 import logging
+from ..utils.logging_system import get_logger
 from typing import Dict, Any
 
 
@@ -24,7 +25,7 @@ class DataArchiver:
             archive_config: 归档配置
         """
         self.archive_config = archive_config
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
     
     def archive_test_data(self, data: Dict[str, Any]) -> bool:
         """

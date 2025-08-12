@@ -6,6 +6,7 @@ Test Runner Module
 """
 
 import logging
+from ..utils.logging_system import get_logger
 from typing import Dict, Any, List
 
 
@@ -24,7 +25,7 @@ class TestRunner:
             canoe_interface: CANoe接口实例
         """
         self.canoe_interface = canoe_interface
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         self.test_results: List[Dict[str, Any]] = []
     
     def run_test_suite(self, test_cases: List[Dict[str, Any]]) -> Dict[str, Any]:

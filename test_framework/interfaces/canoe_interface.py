@@ -11,6 +11,7 @@ CANoe Interface Module
 """
 
 import logging
+from ..utils.logging_system import get_logger
 import os
 import time
 from functools import lru_cache
@@ -75,7 +76,7 @@ def do_events_until(condition: Callable[[], bool], timeout: float = 30.0) -> boo
     start_time = time.time()
     while not condition():
         if time.time() - start_time > timeout:
-            logging.getLogger(__name__).warning(f"等待条件超时: {timeout}秒")
+            get_logger(__name__).warning(f"等待条件超时: {timeout}秒")
             return False
         do_events()
     return True
@@ -99,7 +100,7 @@ class CANoeTestModule:
     
     def start(self) -> bool:
         """启动测试模块"""
-        logger = logging.getLogger(__name__)
+        logger = get_logger(__name__)
         if not self.enabled:
             logger.warning(f"测试模块未启用: {self.name}")
             return False
@@ -144,18 +145,18 @@ class CANoeTestEvents:
         self.started = True
         self.stopped = False
         self.report_generated = False
-        logging.getLogger(__name__).info(f"测试模块已开始: {self.name}")
+        get_logger(__name__).info(f"测试模块已开始: {self.name}")
     
     def OnStop(self, reason):
         """测试停止事件"""
         self.started = False
         self.stopped = True
-        logging.getLogger(__name__).info(f"测试模块已停止: {self.name}")
+        get_logger(__name__).info(f"测试模块已停止: {self.name}")
     
     def OnReportGenerated(self, success, source_full_name, generated_full_name):
         """报告生成事件"""
         self.report_generated = True
-        logging.getLogger(__name__).info(f"测试报告已生成: {source_full_name}")
+        get_logger(__name__).info(f"测试报告已生成: {source_full_name}")
 
 
 class CanoeMeasurementEvents:
@@ -165,13 +166,13 @@ class CanoeMeasurementEvents:
         """测量开始事件"""
         CANoeInterface._started = True
         CANoeInterface._stopped = False
-        logging.getLogger(__name__).info("CANoe测量已开始")
+        get_logger(__name__).info("CANoe测量已开始")
     
     def OnStop(self):
         """测量停止事件"""
         CANoeInterface._started = False
         CANoeInterface._stopped = True
-        logging.getLogger(__name__).info("CANoe测量已停止")
+        get_logger(__name__).info("CANoe测量已停止")
 
 
 class CANoeInterface:
@@ -194,7 +195,7 @@ class CANoeInterface:
             canoe_config: CANoe配置参数，包含project_path和tse_path等
         """
         self.canoe_config = canoe_config
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         self.is_connected = False
         self.canoe_app = None
         

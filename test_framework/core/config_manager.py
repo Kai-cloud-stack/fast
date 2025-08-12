@@ -8,6 +8,7 @@ Config Manager Module
 import json
 import os
 import logging
+from ..utils.logging_system import get_logger
 from typing import Dict, Any, Optional
 from pathlib import Path
 
@@ -30,7 +31,7 @@ class ConfigManager:
         self.config_path = Path(config_path)
         self.main_config: Optional[Dict[str, Any]] = None
         self.task_config: Optional[Dict[str, Any]] = None
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__)
         
         # 配置文件路径
         self.main_config_path = self.config_path
