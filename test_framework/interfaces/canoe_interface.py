@@ -215,6 +215,148 @@ class CANoeInterface:
         self.logging = None
         self.temp_log_name = ""
     
+    def initialize(self) -> bool:
+        """
+        初始化CANoe接口
+        
+        执行完整的CANoe接口初始化流程，包括：
+        - 验证配置参数
+        - 检查CANoe环境可用性
+        - 初始化CANoe应用程序连接
+        - 加载配置文件
+        
+        Returns:
+            bool: 初始化是否成功
+        """
+        self.logger.info("开始初始化CANoe接口")
+        
+        try:
+            # 1. 验证配置参数
+            if not self._validate_configuration():
+                self.logger.error("CANoe配置验证失败")
+                return False
+            
+            # 2. 检查CANoe环境
+            if not self._check_canoe_environment():
+                self.logger.error("CANoe环境检查失败")
+                return False
+            
+            # 3. 初始化CANoe应用程序
+            if not self._initialize_canoe_connection():
+                self.logger.error("CANoe应用程序初始化失败")
+                return False
+            
+            # 4. 加载配置文件
+            if self.config_path and not self._load_configuration():
+                self.logger.warning("CANoe配置文件加载失败，将使用默认配置")
+            
+            self.is_connected = True
+            self.logger.info("CANoe接口初始化成功")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"CANoe接口初始化失败: {str(e)}")
+            self.is_connected = False
+            return False
+    
+    def _validate_configuration(self) -> bool:
+        """
+        验证CANoe配置参数
+        
+        Returns:
+            bool: 配置是否有效
+        """
+        if not self.canoe_config:
+            self.logger.error("CANoe配置为空")
+            return False
+        
+        if 'canoe' not in self.canoe_config:
+            self.logger.error("配置中缺少CANoe配置节")
+            return False
+        
+        canoe_config = self.canoe_config['canoe']
+        
+        # 检查必要的配置项
+        required_configs = ['base_path']
+        for config_key in required_configs:
+            if not canoe_config.get(config_key):
+                self.logger.error(f"缺少必要的配置项: {config_key}")
+                return False
+        
+        # 验证路径存在性
+        if self.project_path and not os.path.exists(self.project_path):
+            self.logger.error(f"CANoe项目路径不存在: {self.project_path}")
+            return False
+        
+        if self.config_path and not os.path.exists(self.config_path):
+            self.logger.warning(f"CANoe配置文件不存在: {self.config_path}")
+        
+        if self.tse_path and not os.path.exists(self.tse_path):
+            self.logger.warning(f"测试环境文件不存在: {self.tse_path}")
+        
+        return True
+    
+    def _check_canoe_environment(self) -> bool:
+        """
+        检查CANoe环境可用性
+        
+        Returns:
+            bool: CANoe环境是否可用
+        """
+        try:
+            # 尝试创建CANoe应用程序对象来检查环境
+            test_app = DispatchEx('CANoe.Application')
+            if test_app:
+                version = test_app.Version
+                self.logger.info(f"检测到CANoe版本: {version.major}.{version.minor}.{version.Build}")
+                return True
+            else:
+                self.logger.error("无法创建CANoe应用程序对象")
+                return False
+        except Exception as e:
+            self.logger.error(f"CANoe环境检查失败: {str(e)}")
+            return False
+    
+    def _initialize_canoe_connection(self) -> bool:
+        """
+        初始化CANoe应用程序连接
+        
+        Returns:
+            bool: 连接是否成功
+        """
+        try:
+            self._initialize_canoe()
+            return True
+        except Exception as e:
+            self.logger.error(f"CANoe连接初始化失败: {str(e)}")
+            return False
+    
+    def _load_configuration(self) -> bool:
+        """
+        加载CANoe配置文件
+        
+        Returns:
+            bool: 配置加载是否成功
+        """
+        try:
+            if not self.app or not self.config_path:
+                return False
+            
+            self.logger.info(f"加载CANoe配置文件: {self.config_path}")
+            self.app.Open(self.config_path)
+            self.configuration = self.app.Configuration
+            
+            if self.configuration:
+                self.logger.info("CANoe配置文件加载成功")
+                return True
+            else:
+                self.logger.error("CANoe配置对象获取失败")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"加载CANoe配置文件失败: {str(e)}")
+            return False
+
     def start_canoe_application(self) -> bool:
         """
         启动CANoe应用程序

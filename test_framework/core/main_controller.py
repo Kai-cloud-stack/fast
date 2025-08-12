@@ -243,8 +243,95 @@ class MainController:
         self.current_phase = "测试执行"
         self.logger.info("开始执行测试用例")
         
-        # 实现测试用例执行逻辑
-        return True
+        try:
+            # 获取任务配置
+            task_config = self.config_manager.load_task_config()
+            test_cases = task_config.get("test_cases", [])
+            
+            if not test_cases:
+                self.logger.warning("未找到测试用例配置")
+                return True
+            
+            self.logger.info(f"共找到 {len(test_cases)} 个测试用例")
+            
+            # 确保CANoe接口已初始化
+            if not self._ensure_canoe_ready():
+                self.logger.error("CANoe接口未就绪")
+                return False
+            
+            # 执行测试用例
+            test_results = self.test_runner.run_test_suite(test_cases)
+            
+            # 保存测试结果
+            self.test_results = test_results
+            
+            # 记录测试结果摘要
+            self._log_test_summary(test_results)
+            
+            # 检查是否有失败的测试用例
+            if test_results.get("failed", 0) > 0:
+                self.logger.warning(f"有 {test_results['failed']} 个测试用例失败")
+                # 根据配置决定是否继续执行
+                if not task_config.get("continue_on_failure", False):
+                    self.logger.error("由于测试失败且配置为不继续执行，停止流程")
+                    return False
+            
+            self.logger.info("测试用例执行完成")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"执行测试用例时发生错误: {str(e)}")
+            return False
+    
+    def _ensure_canoe_ready(self) -> bool:
+        """确保CANoe接口就绪"""
+        try:
+            if not self.canoe_interface:
+                self.logger.error("CANoe接口未初始化")
+                return False
+            
+            # 如果CANoe未连接，尝试初始化
+            if not hasattr(self.canoe_interface, 'canoe_app') or not self.canoe_interface.canoe_app:
+                self.logger.info("初始化CANoe连接")
+                if not self.canoe_interface.initialize():
+                    self.logger.error("CANoe初始化失败")
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"检查CANoe状态时发生错误: {str(e)}")
+            return False
+    
+    def _log_test_summary(self, test_results: Dict[str, Any]) -> None:
+        """记录测试结果摘要"""
+        try:
+            total = test_results.get("total", 0)
+            passed = test_results.get("passed", 0)
+            failed = test_results.get("failed", 0)
+            skipped = test_results.get("skipped", 0)
+            pass_rate = test_results.get("pass_rate", 0.0)
+            
+            self.logger.info("=" * 50)
+            self.logger.info("测试结果摘要:")
+            self.logger.info(f"总计: {total} 个测试用例")
+            self.logger.info(f"通过: {passed} 个")
+            self.logger.info(f"失败: {failed} 个")
+            self.logger.info(f"跳过: {skipped} 个")
+            self.logger.info(f"通过率: {pass_rate:.2f}%")
+            self.logger.info("=" * 50)
+            
+            # 如果有详细结果，记录失败的测试用例
+            if "details" in test_results and failed > 0:
+                self.logger.info("失败的测试用例:")
+                for detail in test_results["details"]:
+                    if detail.get("status") == "failed":
+                        test_name = detail.get("name", "未知")
+                        error_msg = detail.get("error", "无错误信息")
+                        self.logger.error(f"  - {test_name}: {error_msg}")
+                        
+        except Exception as e:
+            self.logger.error(f"记录测试摘要时发生错误: {str(e)}")
     
     def _finalize_execution(self) -> bool:
         """完成执行，归档数据和发送通知"""
