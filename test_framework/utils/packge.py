@@ -1231,7 +1231,7 @@ class FileTransferService:
             successful_files=successful,
             failed_files=failed,
             skipped_files=0,
-            total_bytes=sum(f.size for f in file_list if not f.is_directory),
+            total_bytes=sum(int(f.size) if isinstance(f.size, str) else f.size for f in file_list if not f.is_directory),
             transferred_bytes=total_bytes,
             total_time=0,  # 将在调用方计算
             errors=errors
@@ -1377,7 +1377,7 @@ class WindowsFileSync:
             return TransferSummary(0, 0, 0, 0, 0, 0, 0, [])
 
         # 计算总大小
-        total_size = sum(f.size for f in files if not f.is_directory)
+        total_size = sum(int(f.size) if isinstance(f.size, str) else f.size for f in files if not f.is_directory)
         file_count = len([f for f in files if not f.is_directory])
 
         logger.info(f"发现 {len(files)} 个项目 ({file_count} 个文件, 总大小: {self.progress_monitor._format_bytes(total_size)})")
@@ -1445,7 +1445,7 @@ class WindowsFileSync:
             # 统计信息
             directories = [f for f in files if f.is_directory]
             regular_files = [f for f in files if not f.is_directory]
-            total_size = sum(f.size for f in regular_files)
+            total_size = sum(int(f.size) if isinstance(f.size, str) else f.size for f in regular_files)
 
             logger.info(f"目录: {len(directories)} 个")
             logger.info(f"文件: {len(regular_files)} 个")
