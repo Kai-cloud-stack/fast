@@ -66,7 +66,22 @@ class NotificationService:
             
             table_rows = []
             for key, value in results.items():
-                style = f"{base_style} background-color: #ffdddd;" if key in failed_keywords else base_style
+                # 根据测试结果状态设置不同颜色
+                result_status = str(value).upper() if hasattr(value, 'name') else str(value).upper()
+                
+                if 'PASS' in result_status or '通过' in str(value):
+                    # PASS - 绿色背景
+                    style = f"{base_style} background-color: #d4edda; color: #155724; border-left: 4px solid #28a745;"
+                elif 'FAIL' in result_status or '失败' in str(value) or key in failed_keywords:
+                    # FAIL - 红色背景
+                    style = f"{base_style} background-color: #f8d7da; color: #721c24; border-left: 4px solid #dc3545;"
+                elif 'SKIP' in result_status or '跳过' in str(value):
+                    # SKIP - 灰色背景
+                    style = f"{base_style} background-color: #f8f9fa; color: #6c757d; border-left: 4px solid #6c757d;"
+                else:
+                    # 默认样式
+                    style = base_style
+                
                 table_rows.append(f'<tr><td style="{style}">{key}</td><td style="{style}">{value}</td></tr>')
 
             mail.HTMLBody = generate_html_email(subject, table_rows, base_style, failed_keywords)
