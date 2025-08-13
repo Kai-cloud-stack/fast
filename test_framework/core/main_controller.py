@@ -308,8 +308,8 @@ class MainController:
                 self.logger.error("CANoe接口未就绪")
                 return False
             
-            # 执行测试用例
-            test_results = self.test_runner.run_test_suite(test_cases)
+            # 执行测试用例，传递完整的task_config
+            test_results = self.test_runner.run_test_suite(task_config)
             
             # 保存测试结果
             self.test_results = test_results
