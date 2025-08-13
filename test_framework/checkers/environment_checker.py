@@ -50,8 +50,9 @@ class EnvironmentChecker:
         try:
             # 启动CANoe并初始化连接
             self.canoe_interface.initialize()
-            self.canoe_interface.start_measurement()
             self.canoe_interface.select_test_cases(['Check_Environment'])
+            self.canoe_interface.start_measurement()
+
             self.canoe_interface.run_test_modules()
             self.canoe_interface.stop_measurement()
             self.check_results = self.canoe_interface.test_results
