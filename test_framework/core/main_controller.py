@@ -7,19 +7,25 @@ Main Controller Module
 """
 
 import logging
+import sys
+from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-from .config_manager import ConfigManager
-from ..utils.logging_system import get_logger, setup_project_logging
-from ..checkers.environment_checker import EnvironmentChecker
-from ..executors.task_executor import TaskExecutor
-from ..executors.flash_manager import FlashManager
-from ..executors.test_runner import TestRunner
-from ..services.data_archiver import DataArchiver
-from ..services.notification_service import NotificationService
-from ..services.package_manager import PackageManager
-from ..interfaces.canoe_interface import CANoeInterface
+# 添加项目根目录到Python路径
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from test_framework.core.config_manager import ConfigManager
+from test_framework.utils.logging_system import get_logger, setup_project_logging
+from test_framework.checkers.environment_checker import EnvironmentChecker
+from test_framework.executors.task_executor import TaskExecutor
+from test_framework.executors.flash_manager import FlashManager
+from test_framework.executors.test_runner import TestRunner
+from test_framework.services.data_archiver import DataArchiver
+from test_framework.services.notification_service import NotificationService
+from test_framework.services.package_manager import PackageManager
+from test_framework.interfaces.canoe_interface import CANoeInterface
 
 
 class MainController:

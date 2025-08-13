@@ -11,14 +11,20 @@ CANoe Interface Module
 """
 
 import logging
-from ..utils.logging_system import get_logger
 import os
 import time
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Callable
 from dataclasses import dataclass
 from enum import Enum
+
+# 添加项目根目录到Python路径
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from test_framework.utils.logging_system import get_logger
 
 import pandas as pd
 from win32com.client import Dispatch, DispatchEx, WithEvents, DispatchWithEvents, CastTo

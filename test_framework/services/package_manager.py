@@ -9,13 +9,18 @@ import os
 import asyncio
 import subprocess
 import shutil
+import sys
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
 
-from ..utils.logging_system import get_logger
+# 添加项目根目录到Python路径
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from test_framework.utils.logging_system import get_logger
 
 # 导入共享文件同步模块
-from ..utils.packge import (
+from test_framework.utils.packge import (
     WindowsFileSync, 
     FileFilter, 
     SyncConfig,

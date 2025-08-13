@@ -3,9 +3,16 @@ Service for sending notifications like email and WeChat messages.
 """
 import platform
 import requests
+import sys
+from pathlib import Path
 from typing import List, Dict, Any, Set, Optional
-from ..utils.logging_system import get_logger
-from .html_templates import generate_html_email
+
+# 添加项目根目录到Python路径
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from test_framework.utils.logging_system import get_logger
+from test_framework.services.html_templates import generate_html_email
 
 # 条件导入Windows特有的模块
 if platform.system() == 'Windows':

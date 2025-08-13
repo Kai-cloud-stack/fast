@@ -8,9 +8,15 @@ Config Manager Module
 import json
 import os
 import logging
-from ..utils.logging_system import get_logger
-from typing import Dict, Any, Optional
+import sys
 from pathlib import Path
+from typing import Dict, Any, Optional
+
+# 添加项目根目录到Python路径
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from test_framework.utils.logging_system import get_logger
 
 
 class ConfigManager:
