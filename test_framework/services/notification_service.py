@@ -52,14 +52,18 @@ class NotificationService:
             results (Dict[str, str]): A dictionary containing the results to be included in the email body.
             failed_keywords (Set[str]): A set of keywords that failed.
         """
-        if not self.email_config.get("recipient"):
-            self.logger.warning("Email recipient not configured. Skipping email notification.")
+        # 支持单个收件人(recipient)和多个收件人(recipients)配置
+        recipients = self.email_config.get("recipients") or [self.email_config.get("recipient")]
+        recipients = [r for r in recipients if r]  # 过滤空值
+        
+        if not recipients:
+            self.logger.warning("Email recipients not configured. Skipping email notification.")
             return
 
         try:
             outlook = win32.Dispatch('outlook.application')
             mail = outlook.CreateItem(0)
-            mail.To = self.email_config["recipient"]
+            mail.To = "; ".join(recipients)  # 多个收件人用分号分隔
             mail.Subject = subject
             
             base_style = "padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; color: #333;"
@@ -87,7 +91,7 @@ class NotificationService:
             mail.HTMLBody = generate_html_email(subject, table_rows, base_style, failed_keywords)
             
             mail.Send()
-            self.logger.info(f"Email sent to {self.email_config['recipient']} with subject: {subject}")
+            self.logger.info(f"Email sent to {len(recipients)} recipients ({', '.join(recipients)}) with subject: {subject}")
 
         except Exception as e:
             self.logger.error(f"Failed to send email: {e}")

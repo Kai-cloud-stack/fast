@@ -6,7 +6,10 @@
         "timeout": 30
     },
     "email": {
-        "recipient": "kai.ren@freetech.com"
+        "recipients": [
+            "kai.ren@freetech.com",
+            "linyang.zhang@freetech.com"
+        ]
     },
     "wechat": {
         "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=4f415a3f-52ad-4295-9731-88adf44512d1",
