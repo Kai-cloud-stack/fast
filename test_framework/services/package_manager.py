@@ -14,16 +14,17 @@ from typing import Dict, Any, List, Optional, Union
 
 from ..utils.logging_system import get_logger
 
-# 导入共享文件同步模块（假设文件已迁移到项目根目录）
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from packge import (
+# 导入共享文件同步模块
+from ..utils.packge import (
     WindowsFileSync, 
     FileFilter, 
     SyncConfig,
     TransferSummary,
     ZipProcessingSummary,
-    WindowsFileSyncError
+    WindowsFileSyncError,
+    ExtractionConfig,
+    ExtractionSummary,
+    ExtractionService
 )
 
 
@@ -65,7 +66,29 @@ class PackageManager:
             create_backup=ws_cfg.get("create_backup", package_config.get("create_backup", False))
         )
         
+        # 解压缩配置（从 extraction 子配置读取）
+        extraction_cfg = package_config.get("extraction", {}) if isinstance(package_config, dict) else {}
+        self.extraction_config = ExtractionConfig(
+            enabled=extraction_cfg.get("enabled", True),
+            auto_extract=extraction_cfg.get("auto_extract", True),
+            extract_path=extraction_cfg.get("extract_path", "extracted"),
+            supported_formats=extraction_cfg.get("supported_formats", [".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".gz"]),
+            overwrite_existing=extraction_cfg.get("overwrite_existing", False),
+            preserve_structure=extraction_cfg.get("preserve_structure", True),
+            cleanup_archives=extraction_cfg.get("cleanup_archives", False),
+            max_extract_size=extraction_cfg.get("max_extract_size", 1024 * 1024 * 1024),  # 1GB
+            password_protected=extraction_cfg.get("password_protected", False)
+        )
+        
+        # 初始化解压缩服务
+        self.extraction_service = ExtractionService(self.extraction_config)
+        
         self.logger.info("软件包管理器初始化完成")
+        self.logger.info(f"解压缩功能: {'已启用' if self.extraction_config.enabled else '已禁用'}")
+        if self.extraction_config.enabled:
+            self.logger.info(f"支持的压缩格式: {', '.join(self.extraction_config.supported_formats)}")
+            self.logger.info(f"自动解压: {'是' if self.extraction_config.auto_extract else '否'}")
+            self.logger.info(f"解压路径: {self.extraction_config.extract_path}")
     
     def download_package(self, package_info: Dict[str, Any]) -> str:
         """
@@ -132,6 +155,13 @@ class PackageManager:
                                f"成功: {summary.successful_files}, "
                                f"失败: {summary.failed_files}, "
                                f"用时: {summary.total_time:.2f}秒")
+                
+                # 检查是否需要自动解压
+                if self.extraction_config.enabled and self.extraction_config.auto_extract:
+                    extraction_summary = self._auto_extract_downloaded_files(local_path, package_info)
+                    if extraction_summary and extraction_summary.processed_archives > 0:
+                        self.logger.info(f"自动解压完成: 处理了 {extraction_summary.processed_archives} 个压缩文件")
+                
                 return local_path
             else:
                 raise Exception(f"未成功下载任何文件，失败数: {summary.failed_files}")
@@ -444,6 +474,144 @@ class PackageManager:
         except Exception as e:
             self.logger.error(f"软件包验证失败: {str(e)}")
             return False
+    
+    def _auto_extract_downloaded_files(self, local_path: str, package_info: Dict[str, Any]) -> Optional[ExtractionSummary]:
+        """
+        自动解压下载的文件
+        
+        Args:
+            local_path: 本地下载路径
+            package_info: 软件包信息
+            
+        Returns:
+            Optional[ExtractionSummary]: 解压摘要，如果没有解压则返回None
+        """
+        if not self.extraction_config.enabled:
+            return None
+            
+        try:
+            local_path_obj = Path(local_path)
+            
+            # 确定解压目标路径
+            extract_base_path = None
+            if self.extraction_config.extract_path:
+                if os.path.isabs(self.extraction_config.extract_path):
+                    extract_base_path = Path(self.extraction_config.extract_path)
+                else:
+                    extract_base_path = local_path_obj / self.extraction_config.extract_path
+            
+            self.logger.info(f"开始自动解压: {local_path}")
+            
+            # 执行解压
+            extraction_summary = asyncio.run(
+                self.extraction_service.auto_extract_directory(
+                    local_path_obj, 
+                    extract_base_path, 
+                    recursive=True
+                )
+            )
+            
+            # 如果配置了清理原始压缩文件
+            if self.extraction_config.cleanup_archives and extraction_summary.processed_archives > 0:
+                self._cleanup_extracted_archives(local_path_obj)
+            
+            return extraction_summary
+            
+        except Exception as e:
+            self.logger.error(f"自动解压失败: {str(e)}")
+            return None
+    
+    def _cleanup_extracted_archives(self, directory: Path):
+        """
+        清理已解压的压缩文件
+        
+        Args:
+            directory: 目录路径
+        """
+        try:
+            for format_ext in self.extraction_config.supported_formats:
+                for archive_file in directory.rglob(f"*{format_ext}"):
+                    if archive_file.is_file():
+                        archive_file.unlink()
+                        self.logger.debug(f"已删除压缩文件: {archive_file}")
+            
+            self.logger.info("压缩文件清理完成")
+            
+        except Exception as e:
+            self.logger.error(f"清理压缩文件失败: {str(e)}")
+    
+    def extract_package_archives(self, package_path: str, extract_to: Optional[str] = None) -> ExtractionSummary:
+        """
+        手动解压软件包中的压缩文件
+        
+        Args:
+            package_path: 软件包路径
+            extract_to: 解压目标路径，如果为None则使用配置的路径
+            
+        Returns:
+            ExtractionSummary: 解压摘要
+        """
+        if not self.extraction_config.enabled:
+            raise ValueError("解压功能未启用")
+        
+        package_path_obj = Path(package_path)
+        if not package_path_obj.exists():
+            raise FileNotFoundError(f"软件包路径不存在: {package_path}")
+        
+        # 确定解压目标路径
+        if extract_to:
+            extract_base_path = Path(extract_to)
+        elif self.extraction_config.extract_path:
+            if os.path.isabs(self.extraction_config.extract_path):
+                extract_base_path = Path(self.extraction_config.extract_path)
+            else:
+                extract_base_path = package_path_obj / self.extraction_config.extract_path
+        else:
+            extract_base_path = package_path_obj / "extracted"
+        
+        self.logger.info(f"开始解压软件包: {package_path} -> {extract_base_path}")
+        
+        try:
+            extraction_summary = asyncio.run(
+                self.extraction_service.auto_extract_directory(
+                    package_path_obj, 
+                    extract_base_path, 
+                    recursive=True
+                )
+            )
+            
+            self.logger.info(f"软件包解压完成: 处理了 {extraction_summary.processed_archives} 个压缩文件")
+            return extraction_summary
+            
+        except Exception as e:
+            self.logger.error(f"软件包解压失败: {str(e)}")
+            raise
+    
+    def get_supported_archive_formats(self) -> List[str]:
+        """
+        获取支持的压缩格式列表
+        
+        Returns:
+            List[str]: 支持的压缩格式
+        """
+        return self.extraction_service.get_supported_formats()
+    
+    def update_extraction_config(self, config_updates: Dict[str, Any]):
+        """
+        更新解压缩配置
+        
+        Args:
+            config_updates: 配置更新项
+        """
+        for key, value in config_updates.items():
+            if hasattr(self.extraction_config, key):
+                setattr(self.extraction_config, key, value)
+                self.logger.info(f"解压配置已更新: {key} = {value}")
+            else:
+                self.logger.warning(f"未知的解压配置项: {key}")
+        
+        # 更新解压服务的配置
+        self.extraction_service.config = self.extraction_config
     
     def test_windows_share_download(self) -> bool:
         """

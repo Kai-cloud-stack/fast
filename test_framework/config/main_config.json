@@ -32,6 +32,20 @@
         "default_method": "windows_share",
         "download_path": "./downloads",
         "timeout": 300,
+        "extraction": {
+            "enabled": true,
+            "auto_extract": true,
+            "extract_path": "./extracted",
+            "supported_formats": [".zip", ".rar", ".7z", ".tar", ".tar.gz", ".tar.bz2"],
+            "overwrite_existing": true,
+            "preserve_structure": true,
+            "cleanup_archives": true,
+            "max_extract_size": 524288000,
+            "password_protected": {
+                "enabled": false,
+                "default_passwords": ["123456", "password", "admin"]
+            }
+        },
         "windows_share": {
             "enabled": true,
             "sync_on_startup": true,

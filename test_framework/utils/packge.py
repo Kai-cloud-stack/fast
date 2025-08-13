@@ -15,10 +15,12 @@ import logging
 import fnmatch
 import re
 import zipfile
+import tarfile
+import gzip
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Callable, Union
+from typing import List, Optional, Callable, Union, Dict, Any
 import time
 
 
@@ -50,6 +52,16 @@ class TransferError(WindowsFileSyncError):
 
 class ZipProcessingError(WindowsFileSyncError):
     """ZIP文件处理错误"""
+    pass
+
+
+class ExtractionError(WindowsFileSyncError):
+    """解压缩错误"""
+    pass
+
+
+class UnsupportedFormatError(ExtractionError):
+    """不支持的压缩格式错误"""
     pass
 
 
@@ -99,6 +111,38 @@ class ZipProcessingSummary:
     merged_directories: List[str]
     processing_time: float
     errors: List[str]
+
+
+@dataclass
+class ExtractionSummary:
+    """解压缩摘要"""
+    total_archives: int
+    processed_archives: int
+    failed_archives: int
+    extracted_files: int
+    total_size: int
+    extracted_size: int
+    processing_time: float
+    errors: List[str]
+    formats_processed: Dict[str, int]  # 格式 -> 处理数量
+
+
+@dataclass
+class ExtractionConfig:
+    """解压缩配置"""
+    enabled: bool = True
+    auto_extract: bool = True
+    extract_path: str = "extracted"
+    supported_formats: List[str] = None
+    overwrite_existing: bool = False
+    preserve_structure: bool = True
+    cleanup_archives: bool = False
+    max_extract_size: int = 1024 * 1024 * 1024  # 1GB
+    password_protected: bool = False
+    
+    def __post_init__(self):
+        if self.supported_formats is None:
+            self.supported_formats = ['.zip', '.tar', '.tar.gz', '.tgz', '.tar.bz2', '.gz']
 
 
 @dataclass
@@ -1072,6 +1116,314 @@ class ZipProcessingService:
         )
 
 
+class ExtractionService:
+    """通用解压缩服务"""
+    
+    def __init__(self, config: Optional[ExtractionConfig] = None):
+        self.config = config or ExtractionConfig()
+        self.logger = logging.getLogger(__name__)
+    
+    async def extract_archive(self, 
+                            archive_path: Path, 
+                            extract_to: Optional[Path] = None,
+                            password: Optional[str] = None) -> ExtractionSummary:
+        """解压单个压缩文件"""
+        start_time = time.time()
+        errors = []
+        extracted_files = 0
+        total_size = 0
+        extracted_size = 0
+        
+        try:
+            if not archive_path.exists():
+                raise ExtractionError(f"压缩文件不存在: {archive_path}")
+            
+            # 检查文件大小
+            archive_size = archive_path.stat().st_size
+            if archive_size > self.config.max_extract_size:
+                raise ExtractionError(f"压缩文件过大: {archive_size} bytes > {self.config.max_extract_size} bytes")
+            
+            total_size = archive_size
+            
+            # 确定解压路径
+            if extract_to is None:
+                extract_to = archive_path.parent / self.config.extract_path
+            
+            # 检查是否覆盖
+            if extract_to.exists() and not self.config.overwrite_existing:
+                if any(extract_to.iterdir()):
+                    raise ExtractionError(f"目标目录不为空且不允许覆盖: {extract_to}")
+            
+            # 创建解压目录
+            extract_to.mkdir(parents=True, exist_ok=True)
+            
+            # 根据文件扩展名选择解压方法
+            file_ext = self._get_archive_format(archive_path)
+            if file_ext not in self.config.supported_formats:
+                raise UnsupportedFormatError(f"不支持的压缩格式: {file_ext}")
+            
+            # 执行解压
+            if file_ext == '.zip':
+                extracted_files = await self._extract_zip(archive_path, extract_to, password)
+            elif file_ext in ['.tar', '.tar.gz', '.tgz', '.tar.bz2']:
+                extracted_files = await self._extract_tar(archive_path, extract_to)
+            elif file_ext == '.gz':
+                extracted_files = await self._extract_gzip(archive_path, extract_to)
+            else:
+                raise UnsupportedFormatError(f"未实现的压缩格式: {file_ext}")
+            
+            extracted_size = self._calculate_directory_size(extract_to)
+            
+            # 清理原始文件
+            if self.config.cleanup_archives:
+                archive_path.unlink()
+                self.logger.info(f"已删除原始压缩文件: {archive_path}")
+            
+        except Exception as e:
+            error_msg = f"解压失败 {archive_path}: {str(e)}"
+            errors.append(error_msg)
+            self.logger.error(error_msg)
+        
+        processing_time = time.time() - start_time
+        
+        return ExtractionSummary(
+            total_archives=1,
+            processed_archives=1 if not errors else 0,
+            failed_archives=1 if errors else 0,
+            extracted_files=extracted_files,
+            total_size=total_size,
+            extracted_size=extracted_size,
+            processing_time=processing_time,
+            errors=errors,
+            formats_processed={self._get_archive_format(archive_path): 1}
+        )
+    
+    async def extract_multiple_archives(self, 
+                                      archive_paths: List[Path],
+                                      extract_base_path: Optional[Path] = None) -> ExtractionSummary:
+        """批量解压多个压缩文件"""
+        start_time = time.time()
+        total_archives = len(archive_paths)
+        processed_archives = 0
+        failed_archives = 0
+        total_extracted_files = 0
+        total_size = 0
+        total_extracted_size = 0
+        all_errors = []
+        formats_processed = {}
+        
+        for archive_path in archive_paths:
+            try:
+                # 为每个压缩文件创建单独的解压目录
+                if extract_base_path:
+                    extract_to = extract_base_path / archive_path.stem
+                else:
+                    extract_to = archive_path.parent / self.config.extract_path / archive_path.stem
+                
+                summary = await self.extract_archive(archive_path, extract_to)
+                
+                if summary.errors:
+                    failed_archives += 1
+                    all_errors.extend(summary.errors)
+                else:
+                    processed_archives += 1
+                
+                total_extracted_files += summary.extracted_files
+                total_size += summary.total_size
+                total_extracted_size += summary.extracted_size
+                
+                # 统计格式
+                for fmt, count in summary.formats_processed.items():
+                    formats_processed[fmt] = formats_processed.get(fmt, 0) + count
+                
+            except Exception as e:
+                failed_archives += 1
+                error_msg = f"处理压缩文件失败 {archive_path}: {str(e)}"
+                all_errors.append(error_msg)
+                self.logger.error(error_msg)
+        
+        processing_time = time.time() - start_time
+        
+        return ExtractionSummary(
+            total_archives=total_archives,
+            processed_archives=processed_archives,
+            failed_archives=failed_archives,
+            extracted_files=total_extracted_files,
+            total_size=total_size,
+            extracted_size=total_extracted_size,
+            processing_time=processing_time,
+            errors=all_errors,
+            formats_processed=formats_processed
+        )
+    
+    async def auto_extract_directory(self, 
+                                   directory: Path,
+                                   extract_base_path: Optional[Path] = None,
+                                   recursive: bool = True) -> ExtractionSummary:
+        """自动解压目录中的所有压缩文件"""
+        if not directory.exists() or not directory.is_dir():
+            raise ExtractionError(f"目录不存在或不是目录: {directory}")
+        
+        # 查找所有压缩文件
+        archive_files = []
+        
+        if recursive:
+            for ext in self.config.supported_formats:
+                archive_files.extend(directory.rglob(f"*{ext}"))
+        else:
+            for ext in self.config.supported_formats:
+                archive_files.extend(directory.glob(f"*{ext}"))
+        
+        if not archive_files:
+            self.logger.info(f"目录中未找到支持的压缩文件: {directory}")
+            return ExtractionSummary(
+                total_archives=0,
+                processed_archives=0,
+                failed_archives=0,
+                extracted_files=0,
+                total_size=0,
+                extracted_size=0,
+                processing_time=0.0,
+                errors=[],
+                formats_processed={}
+            )
+        
+        self.logger.info(f"找到 {len(archive_files)} 个压缩文件")
+        return await self.extract_multiple_archives(archive_files, extract_base_path)
+    
+    def _get_archive_format(self, archive_path: Path) -> str:
+        """获取压缩文件格式"""
+        name = archive_path.name.lower()
+        
+        if name.endswith('.tar.gz') or name.endswith('.tgz'):
+            return '.tar.gz'
+        elif name.endswith('.tar.bz2'):
+            return '.tar.bz2'
+        elif name.endswith('.tar'):
+            return '.tar'
+        elif name.endswith('.zip'):
+            return '.zip'
+        elif name.endswith('.gz'):
+            return '.gz'
+        else:
+            return archive_path.suffix.lower()
+    
+    async def _extract_zip(self, archive_path: Path, extract_to: Path, password: Optional[str] = None) -> int:
+        """解压ZIP文件"""
+        extracted_count = 0
+        
+        try:
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                # 检查是否需要密码
+                if password:
+                    zip_ref.setpassword(password.encode())
+                
+                # 获取文件列表
+                file_list = zip_ref.namelist()
+                
+                for file_info in zip_ref.infolist():
+                    try:
+                        # 安全检查：防止路径遍历攻击
+                        if self._is_safe_path(file_info.filename):
+                            zip_ref.extract(file_info, extract_to)
+                            extracted_count += 1
+                        else:
+                            self.logger.warning(f"跳过不安全的路径: {file_info.filename}")
+                    except Exception as e:
+                        self.logger.error(f"解压文件失败 {file_info.filename}: {str(e)}")
+                        
+        except zipfile.BadZipFile:
+            raise ExtractionError(f"损坏的ZIP文件: {archive_path}")
+        except RuntimeError as e:
+            if "Bad password" in str(e):
+                raise ExtractionError(f"ZIP文件密码错误: {archive_path}")
+            raise ExtractionError(f"ZIP文件解压失败: {str(e)}")
+        
+        return extracted_count
+    
+    async def _extract_tar(self, archive_path: Path, extract_to: Path) -> int:
+        """解压TAR文件"""
+        extracted_count = 0
+        
+        try:
+            with tarfile.open(archive_path, 'r:*') as tar_ref:
+                members = tar_ref.getmembers()
+                
+                for member in members:
+                    try:
+                        # 安全检查
+                        if self._is_safe_path(member.name):
+                            tar_ref.extract(member, extract_to)
+                            extracted_count += 1
+                        else:
+                            self.logger.warning(f"跳过不安全的路径: {member.name}")
+                    except Exception as e:
+                        self.logger.error(f"解压文件失败 {member.name}: {str(e)}")
+                        
+        except tarfile.TarError as e:
+            raise ExtractionError(f"TAR文件解压失败: {str(e)}")
+        
+        return extracted_count
+    
+    async def _extract_gzip(self, archive_path: Path, extract_to: Path) -> int:
+        """解压GZIP文件"""
+        try:
+            # 确定输出文件名
+            if archive_path.name.endswith('.gz'):
+                output_name = archive_path.name[:-3]  # 移除.gz后缀
+            else:
+                output_name = archive_path.stem
+            
+            output_path = extract_to / output_name
+            
+            with gzip.open(archive_path, 'rb') as gz_file:
+                with open(output_path, 'wb') as output_file:
+                    shutil.copyfileobj(gz_file, output_file)
+            
+            return 1
+            
+        except Exception as e:
+            raise ExtractionError(f"GZIP文件解压失败: {str(e)}")
+    
+    def _is_safe_path(self, path: str) -> bool:
+        """检查路径是否安全（防止路径遍历攻击）"""
+        # 规范化路径
+        normalized = os.path.normpath(path)
+        
+        # 检查是否包含危险的路径组件
+        dangerous_patterns = ['..', '/', '\\']
+        
+        # 检查绝对路径
+        if os.path.isabs(normalized):
+            return False
+        
+        # 检查路径遍历
+        if any(pattern in normalized for pattern in dangerous_patterns):
+            return False
+        
+        return True
+    
+    def _calculate_directory_size(self, directory: Path) -> int:
+        """计算目录大小"""
+        total_size = 0
+        try:
+            for file_path in directory.rglob('*'):
+                if file_path.is_file():
+                    total_size += file_path.stat().st_size
+        except Exception as e:
+            self.logger.error(f"计算目录大小失败: {str(e)}")
+        
+        return total_size
+    
+    def get_supported_formats(self) -> List[str]:
+        """获取支持的压缩格式列表"""
+        return self.config.supported_formats.copy()
+    
+    def is_supported_format(self, file_path: Path) -> bool:
+        """检查文件是否为支持的压缩格式"""
+        return self._get_archive_format(file_path) in self.config.supported_formats
+
+
 class FileTransferService:
     """处理文件复制和传输"""
 
@@ -1328,10 +1680,12 @@ class WindowsFileSync:
             self.progress_monitor = ProgressMonitor()
             self.transfer_service = FileTransferService(
                 self.share_manager,
-                self._progress_callback,
-                self.config
+                progress_callback=self._progress_callback,
+                config=self.config
             )
             self.zip_service = ZipProcessingService(self.config)
+            # 初始化解压缩服务，使用默认配置
+            self.extraction_service = ExtractionService()
         except Exception as e:
             raise WindowsFileSyncError(f"初始化失败: {e}")
 
@@ -1592,6 +1946,77 @@ class WindowsFileSync:
         return await self.zip_service.extract_all_zips(
             directory, output_directory, keep_original, create_subdirs
         )
+
+    async def extract_archives(self,
+                             directory: Union[str, Path],
+                             extract_base_path: Optional[Union[str, Path]] = None,
+                             recursive: bool = True) -> ExtractionSummary:
+        """
+        解压目录中的所有支持格式的压缩文件
+
+        Args:
+            directory: 包含压缩文件的目录
+            extract_base_path: 解压基础路径，如果为None则在原地解压
+            recursive: 是否递归搜索子目录
+
+        Returns:
+            ExtractionSummary: 解压摘要
+        """
+        directory = Path(directory)
+        
+        if extract_base_path is not None:
+            extract_base_path = Path(extract_base_path)
+
+        logger.info(f"开始解压目录中的所有压缩文件: {directory}")
+
+        return await self.extraction_service.auto_extract_directory(
+            directory, extract_base_path, recursive
+        )
+
+    async def extract_single_archive(self,
+                                   archive_path: Union[str, Path],
+                                   extract_to: Optional[Union[str, Path]] = None,
+                                   password: Optional[str] = None) -> ExtractionSummary:
+        """
+        解压单个压缩文件
+
+        Args:
+            archive_path: 压缩文件路径
+            extract_to: 解压目标路径
+            password: 密码（如果需要）
+
+        Returns:
+            ExtractionSummary: 解压摘要
+        """
+        archive_path = Path(archive_path)
+        
+        if extract_to is not None:
+            extract_to = Path(extract_to)
+
+        logger.info(f"开始解压压缩文件: {archive_path}")
+
+        return await self.extraction_service.extract_archive(
+            archive_path, extract_to, password
+        )
+
+    def update_extraction_config(self, config: ExtractionConfig):
+        """
+        更新解压配置
+
+        Args:
+            config: 新的解压配置
+        """
+        self.extraction_service.config = config
+        logger.info("解压配置已更新")
+
+    def get_supported_archive_formats(self) -> List[str]:
+        """
+        获取支持的压缩格式列表
+
+        Returns:
+            List[str]: 支持的压缩格式
+        """
+        return self.extraction_service.get_supported_formats()
 
     async def sync_and_process_zips(self,
                                   local_path: Union[str, Path],
