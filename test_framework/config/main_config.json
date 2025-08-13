@@ -59,7 +59,7 @@
             "sync_packages": [
                 {
                     "name": "firmware",
-                    "share_path": "\\\\10.179.2.5\\Geely_ADC25_J项目共享盘\\P181\\02.Release\\237_V3.3.1接口0812_SW3.3.7B15",
+                    "share_path": "\\\\10.179.2.5\\\\Geely_ADC25_J项目共享盘\\\\P181\\\\02.Release\\\\237_V3.3.1接口0812_SW3.3.7B15",
                     "local_path": "./downloads/firmware",
                     "extensions": [".zip"],
                     "filename_prefixes": ["vbf"],

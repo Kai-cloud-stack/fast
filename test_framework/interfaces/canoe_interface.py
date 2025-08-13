@@ -222,6 +222,9 @@ class CANoeInterface:
         self.test_setup = None
         self.logging = None
         self.temp_log_name = ""
+        
+        # 自动初始化CANoe接口
+        self.initialize()
     
     def initialize(self) -> bool:
         """
@@ -257,6 +260,13 @@ class CANoeInterface:
             # 4. 加载配置文件
             if self.config_path and not self._load_configuration():
                 self.logger.warning("CANoe配置文件加载失败，将使用默认配置")
+            
+            # 5. 自动加载测试设置
+            if self.tse_path:
+                if self.load_test_setup():
+                    self.logger.info("测试设置自动加载成功")
+                else:
+                    self.logger.warning("测试设置自动加载失败")
             
             self.is_connected = True
             self.logger.info("CANoe接口初始化成功")
