@@ -20,6 +20,32 @@
         "default_mentioned_users": ["15903427830"],
         "enable_notification": true
     },
+    "notification": {
+        "email": {
+            "enabled": true,
+            "smtp_server": "smtp.163.com",
+            "smtp_port": 587,
+            "username": "kai.ren@freetech.com",
+            "password": "your_email_password",
+            "sender": "CANoe测试系统 <kai.ren@freetech.com>",
+            "recipients": ["kai.ren@freetech.com", "linyang.zhang@freetech.com"],
+            "subject_template": "CANoe多TSE测试结果 - {project_name}"
+        }
+    },
+    "output": {
+        "base_directory": "output",
+        "timestamp_folders": true,
+        "formats": {
+            "excel": true,
+            "csv": true,
+            "json": true,
+            "html_report": true
+        },
+        "file_naming": {
+            "combined_results": "combined_test_results",
+            "summary_report": "test_execution_summary"
+        }
+    },
     "logging": {
         "level": "INFO",
         "file_path": "./logs/test_framework.log",
