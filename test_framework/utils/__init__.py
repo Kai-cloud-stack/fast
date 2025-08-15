@@ -28,6 +28,7 @@ from .test_execution_utils import (
     perform_environment_check,
     send_test_notification,
     execute_complete_test_workflow,
+    execute_multi_tse_workflow,
     validate_test_configuration
 )
 
@@ -49,6 +50,7 @@ __all__ = [
     'perform_environment_check',
     'send_test_notification',
     'execute_complete_test_workflow',
+    'execute_multi_tse_workflow',
     'validate_test_configuration',
     'PASS_RESULT',
     'FAIL_RESULT',
