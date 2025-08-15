@@ -747,6 +747,12 @@ class CANoeInterface:
                         break
             
             tm.Enabled = 1 if module_enabled else 0
+            
+            # 同步更新CANoeTestModule对象的enabled属性
+            for test_module in self.test_modules:
+                if test_module.tm == tm:
+                    test_module.enabled = tm.Enabled
+                    break
         
         self.logger.info(f"已选择 {len(case_names)} 个测试用例")
     
