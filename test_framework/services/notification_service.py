@@ -52,27 +52,46 @@ class NotificationService:
             results (Dict[str, str]): A dictionary containing the results to be included in the email body.
             failed_keywords (Set[str]): A set of keywords that failed.
         """
-        if not self.email_config.get("recipient"):
-            self.logger.warning("Email recipient not configured. Skipping email notification.")
+        # 支持单个收件人(recipient)和多个收件人(recipients)配置
+        recipients = self.email_config.get("recipients") or [self.email_config.get("recipient")]
+        recipients = [r for r in recipients if r]  # 过滤空值
+        
+        if not recipients:
+            self.logger.warning("Email recipients not configured. Skipping email notification.")
             return
 
         try:
             outlook = win32.Dispatch('outlook.application')
             mail = outlook.CreateItem(0)
-            mail.To = self.email_config["recipient"]
+            mail.To = "; ".join(recipients)  # 多个收件人用分号分隔
             mail.Subject = subject
             
             base_style = "padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; color: #333;"
             
             table_rows = []
             for key, value in results.items():
-                style = f"{base_style} background-color: #ffdddd;" if key in failed_keywords else base_style
+                # 根据测试结果状态设置不同颜色
+                result_status = str(value).upper() if hasattr(value, 'name') else str(value).upper()
+                
+                if 'PASS' in result_status or '通过' in str(value):
+                    # PASS - 绿色背景
+                    style = f"{base_style} background-color: #d4edda; color: #155724; border-left: 4px solid #28a745;"
+                elif 'FAIL' in result_status or '失败' in str(value) or key in failed_keywords:
+                    # FAIL - 红色背景
+                    style = f"{base_style} background-color: #f8d7da; color: #721c24; border-left: 4px solid #dc3545;"
+                elif 'SKIP' in result_status or '跳过' in str(value):
+                    # SKIP - 灰色背景
+                    style = f"{base_style} background-color: #f8f9fa; color: #6c757d; border-left: 4px solid #6c757d;"
+                else:
+                    # 默认样式
+                    style = base_style
+                
                 table_rows.append(f'<tr><td style="{style}">{key}</td><td style="{style}">{value}</td></tr>')
 
             mail.HTMLBody = generate_html_email(subject, table_rows, base_style, failed_keywords)
             
             mail.Send()
-            self.logger.info(f"Email sent to {self.email_config['recipient']} with subject: {subject}")
+            self.logger.info(f"Email sent to {len(recipients)} recipients ({', '.join(recipients)}) with subject: {subject}")
 
         except Exception as e:
             self.logger.error(f"Failed to send email: {e}")

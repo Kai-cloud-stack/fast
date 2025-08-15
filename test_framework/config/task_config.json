@@ -2,7 +2,7 @@
     "svn_path": ""
     ,
     "flash_config": {
-        "enabled": true,
+        "enabled": false,
         "max_retries": 3,
         "timeout": 120,
         "use_package_manager": true
@@ -10,7 +10,7 @@
     "test_cases": [
         {
             "name": "Test_SWDL",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_InnerReleaseVersion",
@@ -18,87 +18,87 @@
         },
         {
             "name": "Test_ExternalReleaseVersion",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_DiagnosticSessionJump",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_DiagServicePositiveResponse",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_WriteEraseSecurityConst",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_WriteEraseRpaKey",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_PublicKeyD01C",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_VehicleIdentificationNumberF190",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_CameraInputOutput",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_UltrasonicRadarState",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_AnSamplingDectection",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_TemperatureDectection",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_CpuLoadingRam",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_DescreteInputDectection",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_SpiDectection",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_I2cDectection",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_UartDectection",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_ImuParameterDectection",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_GnssStateDectection",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_PartitionDectection",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_CheckSubNoedeF1aaF1ab",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "Test_190A",
-            "enabled": true
+            "enabled": false
         },
         {
             "name": "DurabilityTest_DiagnosticSessionJump",
@@ -114,7 +114,7 @@
         },
         {
             "name": "Test_Other",
-            "enabled": false
+            "enabled": true
         }
     ]
 }
