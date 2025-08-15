@@ -101,17 +101,6 @@ class CANoeTestModule:
     """CANoe测试模块包装类"""
     
     def __init__(self, tm):
-        if not WIN32COM_AVAILABLE:
-            # 在非Windows环境下，创建模拟对象
-            self.tm = None
-            self.events = None
-            self.name = "Mock_Test_Module"
-            self.full_name = "Mock_Test_Module"
-            self.path = "/mock/path"
-            self.enabled = True
-            self.sequence = 1
-            return
-            
         self.tm = tm
         self.events = DispatchWithEvents(tm, CANoeTestEvents)
         self.events.name = tm.Name
@@ -228,9 +217,7 @@ class CANoeInterface:
         
         # 检查win32com是否可用
         if not WIN32COM_AVAILABLE:
-            self.logger.warning("win32com模块不可用，CANoe接口将以模拟模式运行")
-            self._setup_mock_mode()
-            return
+            raise ImportError("win32com模块不可用，无法在非Windows环境下运行CANoe接口")
         
         # 从配置中获取参数
         # 从main_config的canoe配置中获取CANoe配置文件路径
@@ -272,11 +259,6 @@ class CANoeInterface:
         """
         self.logger.info("开始初始化CANoe接口")
         
-        # 如果win32com不可用，直接返回成功（已在模拟模式下设置）
-        if not WIN32COM_AVAILABLE:
-            self.logger.info("CANoe接口在模拟模式下初始化成功")
-            return True
-        
         try:
             # 1. 验证配置参数
             if not self._validate_configuration():
@@ -315,34 +297,7 @@ class CANoeInterface:
             self.is_connected = False
             return False
     
-    def _setup_mock_mode(self) -> None:
-        """
-        设置模拟模式，用于在win32com不可用时提供基本功能
-        """
-        # 从配置中获取参数（模拟模式下也需要这些信息用于日志记录）
-        self.project_path = self.canoe_config['canoe'].get('base_path', '')
-        tse_config = self.canoe_config['canoe'].get('tse_paths', self.canoe_config['canoe'].get('tse_path', ''))
-        if isinstance(tse_config, list):
-            self.tse_paths = tse_config
-        else:
-            self.tse_paths = [tse_config] if tse_config else []
-        self.config_path = self.canoe_config['canoe'].get('configuration_path', '')
-        self.test_results: List[TestCaseResult] = []
-        self.test_modules: List[CANoeTestModule] = []
-        self.all_test_results: List[List[TestCaseResult]] = []
-        
-        # CANoe对象设置为None（模拟模式）
-        self.app = None
-        self.measurement = None
-        self.configuration = None
-        self.test_setup = None
-        self.logging = None
-        self.temp_log_name = ""
-        
-        # 设置连接状态为False（模拟模式下不连接）
-        self.is_connected = False
-        
-        self.logger.info("CANoe接口已设置为模拟模式")
+
     
     def _validate_configuration(self) -> bool:
         """
@@ -592,6 +547,7 @@ class CANoeInterface:
         Returns:
             bool: 加载是否成功
         """
+        
         if not self.app or not self.configuration:
             self.logger.error("CANoe配置未加载")
             return False
@@ -795,13 +751,20 @@ class CANoeInterface:
         self.logger.info(f"已选择 {len(case_names)} 个测试用例")
     
     def get_test_summary(self) -> Dict[str, Any]:
-        """获取测试摘要
+        """
+        获取测试摘要
         
         Returns:
             Dict: 包含测试统计信息的字典
         """
         if not self.test_results:
-            return {}
+            return {
+                'total': 0,
+                'passed': 0,
+                'failed': 0,
+                'skipped': 0,
+                'pass_rate': 0.0
+            }
             
         total = len(self.test_results)
         passed = sum(1 for r in self.test_results if r.result == TestResult.PASS)
@@ -1016,11 +979,40 @@ class CANoeInterface:
             - 通过率: {tse_result['pass_rate']:.2f}%
                 """
             
+            # 构建结果字典用于邮件发送
+            email_results = {
+                "总TSE文件数": summary['total_tse_files'],
+                "成功完成": summary['completed_tse_files'],
+                "执行失败": summary['failed_tse_files'],
+                "总测试用例": summary['overall_stats']['total'],
+                "通过": summary['overall_stats']['passed'],
+                "失败": summary['overall_stats']['failed'],
+                "跳过": summary['overall_stats']['skipped'],
+                "通过率": f"{summary['overall_stats']['pass_rate']:.2f}%"
+            }
+            
+            # 添加各TSE文件的详细结果
+            for i, tse_result in enumerate(summary['tse_results'], 1):
+                tse_name = f"TSE文件{i}"
+                email_results[f"{tse_name}_路径"] = tse_result['tse_path']
+                email_results[f"{tse_name}_测试用例"] = tse_result['total']
+                email_results[f"{tse_name}_通过"] = tse_result['passed']
+                email_results[f"{tse_name}_失败"] = tse_result['failed']
+                email_results[f"{tse_name}_跳过"] = tse_result['skipped']
+                email_results[f"{tse_name}_通过率"] = f"{tse_result['pass_rate']:.2f}%"
+            
+            # 识别失败的关键字
+            failed_keywords = set()
+            if summary['overall_stats']['failed'] > 0:
+                failed_keywords.add('失败')
+            if summary['failed_tse_files'] > 0:
+                failed_keywords.add('执行失败')
+            
             # 发送邮件
             return notification_service.send_email(
                 subject=subject,
-                body=body,
-                test_results=summary
+                results=email_results,
+                failed_keywords=failed_keywords
             )
             
         except Exception as e:

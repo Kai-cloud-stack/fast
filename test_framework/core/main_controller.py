@@ -195,9 +195,15 @@ class MainController:
                 self.logger.error(error_msg)
                 
                 # 发送通知
+                error_results = {
+                    "环境检查结果": "失败",
+                    "错误信息": error_msg,
+                    "时间戳": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
                 self.notification_service.send_email(
                     subject="环境检查失败警告",
-                    content=error_msg
+                    results=error_results,
+                    failed_keywords={'失败', '错误'}
                 )
                 self.notification_service.send_robot_message(
                     message=error_msg,

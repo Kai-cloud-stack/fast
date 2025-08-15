@@ -62,6 +62,10 @@ class NotificationService:
             self.logger.info("Email notification is disabled. Skipping email sending.")
             return
             
+        # 检查win32com是否可用
+        if not WIN32_AVAILABLE:
+            raise ImportError("win32com模块不可用，无法在非Windows环境下发送邮件")
+            
         # 支持单个收件人(recipient)和多个收件人(recipients)配置
         recipients = self.email_config.get("recipients") or [self.email_config.get("recipient")]
         recipients = [r for r in recipients if r]  # 过滤空值
