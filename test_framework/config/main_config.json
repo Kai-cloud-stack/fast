@@ -2,8 +2,10 @@
     "canoe": {
         "base_path": "E:\\A_File\\Basetech\\P181_ADC25_J_Common",
         "configuration_path": "E:\\A_File\\Basetech\\P181_ADC25_J_Common\\P181_ADC25_J_v15.cfg",
+        "check_base_tse_path": "E:\\A_File\\Basetech\\P181_ADC25_J_Common\\05_TestModule\\CheckBaseTest.tse",
         "tse_paths": [
-            "E:\\A_File\\Basetech\\P181_ADC25_J_Common\\05_TestModule\\DiagBastTest.tse"
+            "E:\\A_File\\Basetech\\P181_ADC25_J_Common\\05_TestModule\\DiagBastTest.tse",
+            "E:\\A_File\\Basetech\\P181_ADC25_J_Common\\05_TestModule\\CanBastTest.tse"
         ],
         "timeout": 30
     },

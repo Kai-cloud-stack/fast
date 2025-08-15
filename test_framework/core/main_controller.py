@@ -109,7 +109,7 @@ class MainController:
         self.canoe_interface = CANoeInterface(main_config.get("canoe", {}))
         
         # 初始化检查器
-        self.environment_checker = EnvironmentChecker(self.canoe_interface, self.notification_service)
+        self.environment_checker = EnvironmentChecker(self.canoe_interface, self.notification_service, self.config)
         
         # 初始化执行器
         self.task_executor = TaskExecutor(self.config_manager)

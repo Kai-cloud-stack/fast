@@ -70,19 +70,20 @@ def run_test_tasks(canoe_obj: CANoeInterface, task_config_path: str, tse_name: s
         raise
 
 
-def perform_environment_check(canoe_obj: CANoeInterface) -> bool:
+def perform_environment_check(canoe_obj: CANoeInterface, config: Dict[str, Any] = None) -> bool:
     """
     执行环境检查
     
     Args:
         canoe_obj: CANoe接口对象
+        config: 配置字典
     
     Returns:
         bool: 环境是否准备就绪
     """
     try:
         logging.info("开始环境检查...")
-        tester = EnvironmentChecker(canoe_obj, None)
+        tester = EnvironmentChecker(canoe_obj, None, config)
         tester.check_environment()
         env_results = tester.get_check_results()
         
@@ -216,7 +217,7 @@ def execute_complete_test_workflow(canoe_obj: CANoeInterface, task_config_path: 
     try:
         # 环境检查
         if not skip_env_check:
-            workflow_result['env_check_passed'] = perform_environment_check(canoe_obj)
+            workflow_result['env_check_passed'] = perform_environment_check(canoe_obj, config)
             if not workflow_result['env_check_passed']:
                 workflow_result['error_message'] = "环境检查失败，终止执行"
                 logging.error(workflow_result['error_message'])
