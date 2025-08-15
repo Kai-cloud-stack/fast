@@ -740,7 +740,7 @@ class CANoeInterface:
                 
                 # 检查是否匹配指定的测试用例
                 for case_name in case_names:
-                    if case_name== test_item.Name:
+                    if case_name == test_item.Name:
                         test_item.Enabled = 1
                         module_enabled = True
                         self.logger.info(f"启用测试用例: {test_item.Name}")
