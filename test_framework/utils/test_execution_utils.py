@@ -113,8 +113,33 @@ def execute_multi_tse_workflow(config_file: str = None, task_config_path: str = 
         bool: 执行是否成功
     """
     from ..executors.multi_tse_executor import MultiTSEExecutor
+    from .common_utils import load_main_config
     
     try:
+        # 加载配置
+        if config_file:
+            config = load_main_config(config_file)
+        else:
+            config = load_main_config()
+        
+        # 创建CANoe接口对象进行环境检查
+        canoe_obj = CANoeInterface(config)
+        
+        # 执行环境检查
+        logging.info("开始环境检查")
+        env_check_passed = perform_environment_check(canoe_obj, config)
+        
+        if not env_check_passed:
+            logging.error("环境检查失败，终止多TSE执行")
+            canoe_obj.cleanup()
+            return False
+        
+        logging.info("环境检查通过，开始执行多TSE文件测试")
+        
+        # 清理环境检查使用的CANoe对象
+        canoe_obj.cleanup()
+        
+        # 创建多TSE执行器
         executor = MultiTSEExecutor(config_file)
         
         # 如果提供了task_config_path，将其添加到配置中

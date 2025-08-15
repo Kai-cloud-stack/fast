@@ -27,9 +27,18 @@ sys.path.insert(0, str(project_root))
 from test_framework.utils.logging_system import get_logger
 
 import pandas as pd
-from win32com.client import Dispatch, DispatchEx, WithEvents, DispatchWithEvents, CastTo
-from win32com.client.connect import *
-import pythoncom
+
+# 尝试导入win32com模块，如果失败则设置为None
+try:
+    from win32com.client import Dispatch, DispatchEx, WithEvents, DispatchWithEvents, CastTo
+    from win32com.client.connect import *
+    import pythoncom
+    WIN32COM_AVAILABLE = True
+except ImportError:
+    # 在非Windows环境下，win32com不可用
+    Dispatch = DispatchEx = WithEvents = DispatchWithEvents = CastTo = None
+    pythoncom = None
+    WIN32COM_AVAILABLE = False
 
 
 class TestResult(Enum):
@@ -92,6 +101,17 @@ class CANoeTestModule:
     """CANoe测试模块包装类"""
     
     def __init__(self, tm):
+        if not WIN32COM_AVAILABLE:
+            # 在非Windows环境下，创建模拟对象
+            self.tm = None
+            self.events = None
+            self.name = "Mock_Test_Module"
+            self.full_name = "Mock_Test_Module"
+            self.path = "/mock/path"
+            self.enabled = True
+            self.sequence = 1
+            return
+            
         self.tm = tm
         self.events = DispatchWithEvents(tm, CANoeTestEvents)
         self.events.name = tm.Name
@@ -206,6 +226,12 @@ class CANoeInterface:
         self.is_connected = False
         self.canoe_app = None
         
+        # 检查win32com是否可用
+        if not WIN32COM_AVAILABLE:
+            self.logger.warning("win32com模块不可用，CANoe接口将以模拟模式运行")
+            self._setup_mock_mode()
+            return
+        
         # 从配置中获取参数
         # 从main_config的canoe配置中获取CANoe配置文件路径
         self.project_path = canoe_config['canoe'].get('base_path', '')
@@ -246,6 +272,11 @@ class CANoeInterface:
         """
         self.logger.info("开始初始化CANoe接口")
         
+        # 如果win32com不可用，直接返回成功（已在模拟模式下设置）
+        if not WIN32COM_AVAILABLE:
+            self.logger.info("CANoe接口在模拟模式下初始化成功")
+            return True
+        
         try:
             # 1. 验证配置参数
             if not self._validate_configuration():
@@ -283,6 +314,35 @@ class CANoeInterface:
             self.logger.error(f"CANoe接口初始化失败: {str(e)}")
             self.is_connected = False
             return False
+    
+    def _setup_mock_mode(self) -> None:
+        """
+        设置模拟模式，用于在win32com不可用时提供基本功能
+        """
+        # 从配置中获取参数（模拟模式下也需要这些信息用于日志记录）
+        self.project_path = self.canoe_config['canoe'].get('base_path', '')
+        tse_config = self.canoe_config['canoe'].get('tse_paths', self.canoe_config['canoe'].get('tse_path', ''))
+        if isinstance(tse_config, list):
+            self.tse_paths = tse_config
+        else:
+            self.tse_paths = [tse_config] if tse_config else []
+        self.config_path = self.canoe_config['canoe'].get('configuration_path', '')
+        self.test_results: List[TestCaseResult] = []
+        self.test_modules: List[CANoeTestModule] = []
+        self.all_test_results: List[List[TestCaseResult]] = []
+        
+        # CANoe对象设置为None（模拟模式）
+        self.app = None
+        self.measurement = None
+        self.configuration = None
+        self.test_setup = None
+        self.logging = None
+        self.temp_log_name = ""
+        
+        # 设置连接状态为False（模拟模式下不连接）
+        self.is_connected = False
+        
+        self.logger.info("CANoe接口已设置为模拟模式")
     
     def _validate_configuration(self) -> bool:
         """
