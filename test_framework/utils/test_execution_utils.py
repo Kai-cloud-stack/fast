@@ -16,7 +16,6 @@ from typing import Dict, List, Set, Any
 
 from ..checkers.environment_checker import EnvironmentChecker
 from ..interfaces.canoe_interface import CANoeInterface
-from ..services.notification_service import NotificationService
 from .common_utils import (
     load_task_config,
     get_enabled_test_cases,
@@ -196,7 +195,8 @@ def send_test_notification(config: Dict[str, Any], results_dict: Dict[str, Any],
         summary = format_test_summary(results_dict, failed_cases, execution_time)
         logging.info(f"测试摘要:\n{summary}")
         
-        # 发送通知
+        # 发送通知（延迟导入避免循环导入）
+        from ..services.notification_service import NotificationService
         notification_config = {
             'email': email_config or {},
             'wechat': wechat_config or {}

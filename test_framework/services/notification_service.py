@@ -48,7 +48,7 @@ class NotificationService:
         # 检查微信配置是否启用  
         self.wechat_enabled = self.wechat_config.get('enable_notification', False)
 
-    def send_email(self, subject: str, results: Dict[str, str], failed_keywords: Set[str]) -> None:
+    def send_email(self, subject: str, results: Dict[str, str], failed_keywords: Set[str], attachment_path: str = None) -> None:
         """
         Sends an email with the given subject and results.
 
@@ -56,6 +56,7 @@ class NotificationService:
             subject (str): The subject of the email.
             results (Dict[str, str]): A dictionary containing the results to be included in the email body.
             failed_keywords (Set[str]): A set of keywords that failed.
+            attachment_path (str): Optional path to HTML file to attach.
         """
         # 检查邮件功能是否启用
         if not self.email_enabled:
@@ -103,6 +104,14 @@ class NotificationService:
                 table_rows.append(f'<tr><td style="{style}">{key}</td><td style="{style}">{value}</td></tr>')
 
             mail.HTMLBody = generate_html_email(subject, table_rows, base_style, failed_keywords)
+            
+            # 添加HTML附件（如果提供了路径）
+            if attachment_path and Path(attachment_path).exists():
+                try:
+                    mail.Attachments.Add(str(Path(attachment_path).absolute()))
+                    self.logger.info(f"已添加HTML报告附件: {attachment_path}")
+                except Exception as e:
+                    self.logger.warning(f"添加附件失败: {e}")
             
             mail.Send()
             self.logger.info(f"Email sent to {len(recipients)} recipients ({', '.join(recipients)}) with subject: {subject}")

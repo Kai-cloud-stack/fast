@@ -336,9 +336,16 @@ class MultiTSEExecutor:
             self.logger.info("保存测试结果...")
             self._save_results(summary, output_dir)
             
-            # 6. 发送通知
+            # 6. 获取最新生成的HTML报告路径
+            html_report_path = output_dir / "test_execution_report.html"
+            
+            # 7. 发送通知（包含HTML附件）
             self.logger.info("发送测试结果通知...")
-            email_sent = self.canoe_interface.send_summary_email(summary, self.notification_service)
+            email_sent = self.canoe_interface.send_summary_email(
+                summary, 
+                self.notification_service, 
+                str(html_report_path) if html_report_path.exists() else None
+            )
             
             if email_sent:
                 self.logger.info("通知邮件发送成功")

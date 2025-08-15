@@ -931,13 +931,14 @@ class CANoeInterface:
         self.logger.info(f"生成合并测试结果报告，共 {len(df)} 条记录")
         return df
     
-    def send_summary_email(self, summary: Dict[str, Any], notification_service=None) -> bool:
+    def send_summary_email(self, summary: Dict[str, Any], notification_service=None, html_report_path: str = None) -> bool:
         """
         发送测试结果汇总邮件
         
         Args:
             summary: 测试结果汇总信息
             notification_service: 通知服务实例
+            html_report_path: HTML报告文件路径（可选）
             
         Returns:
             bool: 发送是否成功
@@ -1008,11 +1009,12 @@ class CANoeInterface:
             if summary['failed_tse_files'] > 0:
                 failed_keywords.add('执行失败')
             
-            # 发送邮件
+            # 发送邮件（包含HTML附件）
             return notification_service.send_email(
                 subject=subject,
                 results=email_results,
-                failed_keywords=failed_keywords
+                failed_keywords=failed_keywords,
+                attachment_path=html_report_path
             )
             
         except Exception as e:
