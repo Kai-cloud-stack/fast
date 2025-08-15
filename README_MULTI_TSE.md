@@ -10,7 +10,7 @@
 - ✅ **顺序执行**: 按配置顺序依次执行每个TSE文件
 - ✅ **智能测试用例匹配**: 根据TSE文件名自动匹配对应的测试用例组
 - ✅ **结果汇总**: 自动汇总所有TSE文件的测试结果
-- ✅ **多格式输出**: 支持Excel、CSV、JSON、HTML等多种格式的结果输出
+- ✅ **HTML报告**: 生成详细的HTML格式测试报告
 - ✅ **邮件通知**: 执行完成后自动发送详细的测试结果邮件
 - ✅ **向后兼容**: 完全兼容原有的单TSE文件执行方式
 - ✅ **详细报告**: 生成包含统计信息和详细结果的HTML报告
@@ -135,15 +135,11 @@ python3 temp_main.py --mode single --task-config test_framework/config/task_conf
 ```json
 "output": {
   "base_directory": "output",
-  "timestamp_folders": true,
-  "formats": {
-    "excel": true,
-    "csv": true,
-    "json": true,
-    "html_report": true
-  }
+  "timestamp_folders": true
 }
 ```
+
+注意：多TSE模式现在只生成HTML格式的测试报告，不再支持Excel、CSV、JSON格式输出。
 
 ### 编程接口使用
 
@@ -230,9 +226,6 @@ for i, tse_path in enumerate(canoe_interface.tse_paths):
 ```
 output/
 └── multi_tse_execution_20231201_143022/
-    ├── combined_test_results.xlsx      # Excel格式的合并结果
-    ├── combined_test_results.csv       # CSV格式的合并结果
-    ├── test_execution_summary.json     # JSON格式的执行摘要
     └── test_execution_report.html      # HTML格式的详细报告
 ```
 
@@ -242,7 +235,7 @@ output/
 - 执行概况（TSE文件数量、测试用例统计）
 - 各TSE文件的详细结果
 - 总体通过率和统计信息
-- 附件（Excel结果文件）
+- HTML报告链接或内容
 
 ### 控制台输出
 

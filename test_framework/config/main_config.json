@@ -32,17 +32,7 @@
     },
     "output": {
         "base_directory": "output",
-        "timestamp_folders": true,
-        "formats": {
-            "excel": true,
-            "csv": true,
-            "json": true,
-            "html_report": true
-        },
-        "file_naming": {
-            "combined_results": "combined_test_results",
-            "summary_report": "test_execution_summary"
-        }
+        "timestamp_folders": true
     },
     "logging": {
         "level": "INFO",

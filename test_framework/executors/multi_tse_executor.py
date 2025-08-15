@@ -142,57 +142,18 @@ class MultiTSEExecutor:
     
     def _save_results(self, summary: Dict[str, Any], output_dir: Path) -> None:
         """
-        保存测试结果
+        保存测试结果（仅保留HTML格式）
         
         Args:
             summary: 测试结果汇总
             output_dir: 输出目录
         """
-        output_config = self.config.get('output', {})
-        formats = output_config.get('formats', {})
-        file_naming = output_config.get('file_naming', {})
-        
         # 获取合并的测试结果数据框
         combined_df = self.canoe_interface.get_combined_test_results_dataframe()
         
-        if not combined_df.empty:
-            base_name = file_naming.get('combined_results', 'combined_test_results')
-            
-            # 保存Excel格式
-            if formats.get('excel', True):
-                excel_file = output_dir / f"{base_name}.xlsx"
-                combined_df.to_excel(excel_file, index=False)
-                self.logger.info(f"Excel结果已保存: {excel_file}")
-            
-            # 保存CSV格式
-            if formats.get('csv', True):
-                csv_file = output_dir / f"{base_name}.csv"
-                combined_df.to_csv(csv_file, index=False, encoding='utf-8-sig')
-                self.logger.info(f"CSV结果已保存: {csv_file}")
-        
-        # 保存JSON格式的汇总信息
-        if formats.get('json', True):
-            summary_name = file_naming.get('summary_report', 'test_execution_summary')
-            json_file = output_dir / f"{summary_name}.json"
-            
-            # 添加执行时间信息
-            summary['execution_info'] = {
-                'start_time': self.execution_start_time.isoformat() if self.execution_start_time else None,
-                'end_time': self.execution_end_time.isoformat() if self.execution_end_time else None,
-                'duration_seconds': (
-                    (self.execution_end_time - self.execution_start_time).total_seconds()
-                    if self.execution_start_time and self.execution_end_time else None
-                )
-            }
-            
-            with open(json_file, 'w', encoding='utf-8') as f:
-                json.dump(summary, f, ensure_ascii=False, indent=2)
-            
-            self.logger.info(f"JSON汇总已保存: {json_file}")
-        
-        # 生成HTML报告
-        if formats.get('html_report', True):
-            self._generate_html_report(summary, combined_df, output_dir)
+        # 仅生成HTML报告
+        self.logger.info("生成HTML测试报告...")
+        self._generate_html_report(summary, combined_df, output_dir)
     
     def _generate_html_report(self, summary: Dict[str, Any], df, output_dir: Path) -> None:
         """
