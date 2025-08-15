@@ -169,7 +169,11 @@ def send_test_notification(config: Dict[str, Any], results_dict: Dict[str, Any],
         logging.info(f"测试摘要:\n{summary}")
         
         # 发送通知
-        notification_service = NotificationService(email_config, wechat_config)
+        notification_config = {
+            'email': email_config or {},
+            'wechat': wechat_config or {}
+        }
+        notification_service = NotificationService(notification_config)
         notification_service.send_email(
             subject='测试执行结果通知',
             results=results_dict,

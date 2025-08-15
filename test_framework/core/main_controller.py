@@ -97,10 +97,11 @@ class MainController:
         main_config = self.config_manager.load_main_config()
         
         # 初始化服务 (NotificationService needs to be initialized before checkers)
-        self.notification_service = NotificationService(
-            email_config=main_config.get("email", {}),
-            wechat_config=main_config.get("wechat", {})
-        )
+        notification_config = {
+            'email': main_config.get("email", {}),
+            'wechat': main_config.get("wechat", {})
+        }
+        self.notification_service = NotificationService(notification_config)
         self.data_archiver = DataArchiver(main_config.get("archive", {}))
         self.package_manager = PackageManager(main_config.get("package_manager", {}))
 

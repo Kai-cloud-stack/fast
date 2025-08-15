@@ -31,17 +31,22 @@ class NotificationService:
     Service for sending notifications.
     """
 
-    def __init__(self, email_config: Dict[str, Any], wechat_config: Dict[str, Any]):
+    def __init__(self, notification_config: Dict[str, Any]):
         """
-        Initializes the NotificationService with email and WeChat configurations.
+        Initializes the NotificationService with notification configurations.
 
         Args:
-            email_config (Dict[str, Any]): Configuration for sending emails.
-            wechat_config (Dict[str, Any]): Configuration for sending WeChat messages.
+            notification_config (Dict[str, Any]): Configuration for notifications including email and WeChat.
         """
-        self.email_config = email_config
-        self.wechat_config = wechat_config
+        self.notification_config = notification_config
+        self.email_config = notification_config.get('email', {})
+        self.wechat_config = notification_config.get('wechat', {})
         self.logger = get_logger(self.__class__.__name__)
+        
+        # 检查邮件配置是否启用
+        self.email_enabled = self.email_config.get('enabled', False)
+        # 检查微信配置是否启用  
+        self.wechat_enabled = self.wechat_config.get('enable_notification', False)
 
     def send_email(self, subject: str, results: Dict[str, str], failed_keywords: Set[str]) -> None:
         """
@@ -52,6 +57,11 @@ class NotificationService:
             results (Dict[str, str]): A dictionary containing the results to be included in the email body.
             failed_keywords (Set[str]): A set of keywords that failed.
         """
+        # 检查邮件功能是否启用
+        if not self.email_enabled:
+            self.logger.info("Email notification is disabled. Skipping email sending.")
+            return
+            
         # 支持单个收件人(recipient)和多个收件人(recipients)配置
         recipients = self.email_config.get("recipients") or [self.email_config.get("recipient")]
         recipients = [r for r in recipients if r]  # 过滤空值
@@ -103,6 +113,11 @@ class NotificationService:
         Args:
             content (str): The content of the message to be sent.
         """
+        # 检查微信功能是否启用
+        if not self.wechat_enabled:
+            self.logger.info("WeChat notification is disabled. Skipping WeChat message sending.")
+            return
+            
         if not self.wechat_config.get("webhook_url"):
             self.logger.warning("WeChat webhook URL not configured. Skipping WeChat notification.")
             return
