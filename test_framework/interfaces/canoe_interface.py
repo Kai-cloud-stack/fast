@@ -240,6 +240,7 @@ class CANoeInterface:
         self.test_setup = None
         self.logging = None
         self.temp_log_name = ""
+        self.current_tse_path = None  # 当前加载的TSE文件路径
         
         # 自动初始化CANoe接口
         self.initialize()
@@ -569,6 +570,9 @@ class CANoeInterface:
                 
             test_env = CastTo(test_env, "ITestEnvironment2")
             
+            # 记录当前加载的TSE文件路径
+            self.current_tse_path = full_tse_path
+            
             # 加载测试模块
             self.test_modules = []
             self._traverse_test_items(test_env, lambda tm: self.test_modules.append(CANoeTestModule(tm)))
@@ -728,7 +732,39 @@ class CANoeInterface:
             return
             
         # 重新获取最新的测试环境和测试模块（确保加载新TSE后的结构）
-        test_env = self.app.Configuration.TestSetup.TestEnvironments.Item(1)
+        # 根据当前加载的TSE路径找到对应的测试环境，使用直接名称匹配
+        test_env = None
+        if self.current_tse_path:
+            test_environments = self.app.Configuration.TestSetup.TestEnvironments
+            current_tse_name = os.path.basename(self.current_tse_path)
+            tse_base_name = os.path.splitext(current_tse_name)[0]
+            
+            try:
+                # 直接通过名称获取测试环境
+                test_env = test_environments.Item(tse_base_name)
+                self.logger.info(f"找到匹配的测试环境: {tse_base_name}")
+            except:
+                # 如果直接匹配失败，尝试遍历查找
+                self.logger.info(f"直接匹配失败，尝试遍历查找匹配的测试环境")
+                for i in range(1, test_environments.Count + 1):
+                    env = test_environments.Item(i)
+                    env_name = env.Name
+                    self.logger.debug(f"检查测试环境: {env_name}")
+                    
+                    # 尝试多种匹配方式
+                    if (env.FullName == self.current_tse_path or 
+                        env_name == current_tse_name or
+                        tse_base_name in env_name or
+                        env_name in tse_base_name):
+                        test_env = env
+                        self.logger.info(f"找到匹配的测试环境: {env_name} (TSE: {current_tse_name})")
+                        break
+        
+        if test_env is None:
+            # 如果没有找到匹配的测试环境，使用第一个作为后备
+            self.logger.warning(f"未找到匹配当前TSE路径 {self.current_tse_path} 的测试环境，使用第一个测试环境")
+            test_env = self.app.Configuration.TestSetup.TestEnvironments.Item(1)
+        
         test_modules = [CastTo(item, 'ITSTestModule2') for item in test_env.Items]
         test_env.Enabled = True
         
