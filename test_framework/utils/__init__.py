@@ -22,7 +22,7 @@ from .common_utils import (
     DEFAULT_ENCODING
 )
 
-from .logging_system import get_logger
+from .logging_system import get_logger, setup_project_logging, get_project_log_file, get_project_log_level
 from .test_execution_utils import (
     run_test_tasks,
     perform_environment_check,
@@ -46,6 +46,9 @@ __all__ = [
     'safe_execute',
     'create_directory_if_not_exists',
     'get_logger',
+    'setup_project_logging',
+    'get_project_log_file',
+    'get_project_log_level',
     'run_test_tasks',
     'perform_environment_check',
     'send_test_notification',

@@ -10,6 +10,10 @@ import os
 from datetime import datetime
 from typing import Optional
 
+# 全局变量存储项目日志文件路径
+_project_log_file = None
+_project_log_level = 'INFO'
+
 
 def get_logger(name: str, log_level: str = 'INFO', log_file: Optional[str] = None) -> logging.Logger:
     """
@@ -18,19 +22,24 @@ def get_logger(name: str, log_level: str = 'INFO', log_file: Optional[str] = Non
     Args:
         name: 日志记录器名称，通常使用 __name__
         log_level: 日志级别 ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
-        log_file: 可选的日志文件路径，如果不提供则只输出到控制台
+        log_file: 可选的日志文件路径，如果不提供则尝试使用项目级别的日志文件
     
     Returns:
         配置好的日志记录器实例
     """
+    global _project_log_file, _project_log_level
+    
     logger = logging.getLogger(name)
     
     # 如果logger已经有处理器，直接返回
     if logger.handlers:
         return logger
     
-    # 设置日志级别
-    level = getattr(logging, log_level.upper(), logging.INFO)
+    # 设置日志级别，优先使用传入的级别，否则使用项目级别
+    if log_level == 'INFO' and _project_log_level != 'INFO':
+        level = getattr(logging, _project_log_level.upper(), logging.INFO)
+    else:
+        level = getattr(logging, log_level.upper(), logging.INFO)
     logger.setLevel(level)
     
     # 创建格式化器
@@ -45,14 +54,17 @@ def get_logger(name: str, log_level: str = 'INFO', log_file: Optional[str] = Non
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     
-    # 如果指定了日志文件，创建文件处理器
-    if log_file:
+    # 确定要使用的日志文件
+    target_log_file = log_file or _project_log_file
+    
+    # 如果有日志文件，创建文件处理器
+    if target_log_file:
         # 确保日志目录存在
-        log_dir = os.path.dirname(log_file)
+        log_dir = os.path.dirname(target_log_file)
         if log_dir and not os.path.exists(log_dir):
             os.makedirs(log_dir, exist_ok=True)
         
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler = logging.FileHandler(target_log_file, encoding='utf-8')
         file_handler.setLevel(level)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
@@ -77,6 +89,8 @@ def setup_project_logging(project_name: str = 'CANoe_Test_Framework',
     Returns:
         项目主日志记录器
     """
+    global _project_log_file, _project_log_level
+    
     # 创建日志目录
     if not os.path.exists(log_dir):
         os.makedirs(log_dir, exist_ok=True)
@@ -85,11 +99,16 @@ def setup_project_logging(project_name: str = 'CANoe_Test_Framework',
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     log_file = os.path.join(log_dir, f'{project_name}_{timestamp}.log')
     
+    # 设置全局日志配置
+    _project_log_file = log_file
+    _project_log_level = log_level
+    
     # 获取项目主日志记录器
     main_logger = get_logger(project_name, log_level, log_file)
     
     main_logger.info(f"日志系统初始化完成 - 日志文件: {log_file}")
     main_logger.info(f"日志级别: {log_level}")
+    main_logger.info("所有模块的日志将自动保存到此文件")
     
     return main_logger
 
@@ -117,6 +136,28 @@ def get_module_logger(module_name: str, parent_logger: Optional[logging.Logger] 
         return get_logger(logger_name)
     
     return logger
+
+
+def get_project_log_file() -> Optional[str]:
+    """
+    获取当前项目日志文件路径
+    
+    Returns:
+        项目日志文件路径，如果未设置则返回None
+    """
+    global _project_log_file
+    return _project_log_file
+
+
+def get_project_log_level() -> str:
+    """
+    获取当前项目日志级别
+    
+    Returns:
+        项目日志级别
+    """
+    global _project_log_level
+    return _project_log_level
 
 
 if __name__ == '__main__':
