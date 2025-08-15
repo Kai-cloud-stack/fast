@@ -757,12 +757,13 @@ class CANoeInterface:
         }
     
 
-    def run_multiple_tse_files(self, task_config_path: str = None) -> Dict[str, Any]:
+    def run_multiple_tse_files(self, task_config_path: str = None, measurement_started: bool = False) -> Dict[str, Any]:
         """
         按顺序运行多个tse文件并汇总结果
         
         Args:
             task_config_path: 任务配置文件路径，用于根据TSE名称匹配测试用例
+            measurement_started: 测量是否已经启动，如果为False则在每个TSE执行前启动测量
         
         Returns:
             Dict: 包含所有测试结果的汇总信息
@@ -796,13 +797,18 @@ class CANoeInterface:
                 self.test_results.clear()
                 self.test_modules.clear()
                 
+                # 如果测量已启动，先停止测量以便重新配置
+                if measurement_started and self.running():
+                    self.logger.info("停止当前测量以重新配置TSE")
+                    self.stop_measurement()
+                
                 # 加载当前tse文件
                 if not self.load_test_setup(tse_path):
                     self.logger.error(f"加载tse文件失败: {tse_path}")
                     overall_summary['failed_tse_files'] += 1
                     continue
                 
-                # 根据TSE名称选择对应的测试用例
+                # 根据TSE名称选择对应的测试用例（在启动测量之前）
                 if task_config_path:
                     from test_framework.utils.common_utils import load_task_config, get_enabled_test_cases
                     import os
@@ -825,8 +831,21 @@ class CANoeInterface:
                     except Exception as e:
                         self.logger.error(f"选择测试用例时发生错误: {e}，将运行所有启用的测试模块")
                 
+                # 启动测量（在选择测试用例之后）
+                if not measurement_started or not self.running():
+                    self.logger.info(f"为TSE文件 {tse_path} 启动测量")
+                    if not self.start_measurement():
+                        self.logger.error(f"启动测量失败，跳过TSE文件: {tse_path}")
+                        overall_summary['failed_tse_files'] += 1
+                        continue
+                
                 # 运行测试
                 test_df = self.run_test_modules()
+                
+                # 停止测量（为下一个TSE做准备）
+                if not measurement_started:
+                    self.logger.info(f"TSE文件 {tse_path} 测试完成，停止测量")
+                    self.stop_measurement()
                 
                 # 获取当前tse的测试摘要
                 tse_summary = self.get_test_summary()

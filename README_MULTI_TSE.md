@@ -192,11 +192,8 @@ config = {
 # 创建CANoe接口
 canoe_interface = CANoeInterface(config)
 
-# 启动测量
-canoe_interface.start_measurement()
-
-# 执行多TSE文件
-summary = canoe_interface.run_multiple_tse_files()
+# 执行多TSE文件（内部自动管理测量生命周期）
+summary = canoe_interface.run_multiple_tse_files(measurement_started=False)
 
 # 获取合并的测试结果
 combined_df = canoe_interface.get_combined_test_results_dataframe()
@@ -281,8 +278,12 @@ TSE文件执行情况:
 
 ### CANoeInterface 新增方法
 
-#### `run_multiple_tse_files() -> Dict[str, Any]`
+#### `run_multiple_tse_files(task_config_path: str = None, measurement_started: bool = False) -> Dict[str, Any]`
 按顺序执行所有配置的TSE文件并返回汇总结果。
+
+**参数:**
+- `task_config_path`: 任务配置文件路径，用于选择测试用例
+- `measurement_started`: 是否已经启动测量。如果为False，方法内部会自动管理测量的启动和停止
 
 **返回值:**
 ```python

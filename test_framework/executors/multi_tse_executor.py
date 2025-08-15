@@ -343,13 +343,7 @@ class MultiTSEExecutor:
             # 3. 创建输出目录
             output_dir = self._create_output_directory()
             
-            # 4. 启动CANoe测量
-            self.logger.info("启动CANoe测量...")
-            if not self.canoe_interface.start_measurement():
-                self.logger.error("启动CANoe测量失败")
-                return False
-            
-            # 5. 执行多TSE文件
+            # 4. 执行多TSE文件（内部管理测量生命周期）
             self.logger.info("开始执行多TSE文件...")
             
             # 获取任务配置文件路径（如果配置中有的话）
@@ -357,7 +351,8 @@ class MultiTSEExecutor:
             if task_config_path:
                 self.logger.info(f"使用任务配置文件: {task_config_path}")
             
-            summary = self.canoe_interface.run_multiple_tse_files(task_config_path)
+            # 使用measurement_started=False，让run_multiple_tse_files内部管理测量
+            summary = self.canoe_interface.run_multiple_tse_files(task_config_path, measurement_started=False)
             
             if not summary:
                 self.logger.error("多TSE文件执行失败")
@@ -365,11 +360,11 @@ class MultiTSEExecutor:
             
             self.execution_end_time = datetime.now()
             
-            # 6. 保存结果
+            # 5. 保存结果
             self.logger.info("保存测试结果...")
             self._save_results(summary, output_dir)
             
-            # 7. 发送通知
+            # 6. 发送通知
             self.logger.info("发送测试结果通知...")
             email_sent = self.canoe_interface.send_summary_email(summary, self.notification_service)
             
@@ -377,10 +372,6 @@ class MultiTSEExecutor:
                 self.logger.info("通知邮件发送成功")
             else:
                 self.logger.warning("通知邮件发送失败")
-            
-            # 8. 停止CANoe测量
-            self.logger.info("停止CANoe测量...")
-            self.canoe_interface.stop_measurement()
             
             # 9. 打印执行摘要
             self._print_execution_summary(summary)
