@@ -727,27 +727,45 @@ class CANoeInterface:
             self.logger.error("CANoe测试设置未加载")
             return
             
+        # 重新获取最新的测试环境和测试模块（确保加载新TSE后的结构）
         test_env = self.app.Configuration.TestSetup.TestEnvironments.Item(1)
         test_modules = [CastTo(item, 'ITSTestModule2') for item in test_env.Items]
         test_env.Enabled = True
         
+        self.logger.info(f"当前测试环境包含 {len(test_modules)} 个测试模块")
+        
+        enabled_count = 0
+        total_test_cases = 0
+        
         for tm in test_modules:
             module_enabled = False
             module = CANoeTestModule(tm)
+            module_name = tm.Name if hasattr(tm, 'Name') else "未知模块"
+            
+            self.logger.info(f"处理测试模块: {module_name}，包含 {module.sequence.Count} 个测试用例")
             
             for index in range(1, module.sequence.Count + 1):
                 test_item = module.sequence.Item(index)
                 test_item.Enabled = 0  # 默认禁用
+                total_test_cases += 1
                 
                 # 检查是否匹配指定的测试用例
                 for case_name in case_names:
                     if case_name == test_item.Name:
                         test_item.Enabled = 1
                         module_enabled = True
-                        self.logger.info(f"启用测试用例: {test_item.Name}")
+                        enabled_count += 1
+                        self.logger.info(f"启用测试用例: {test_item.Name} (模块: {module_name})")
                         break
+                else:
+                    # 如果没有匹配，记录调试信息
+                    self.logger.debug(f"测试用例 {test_item.Name} 未在选择列表中，保持禁用状态")
             
             tm.Enabled = 1 if module_enabled else 0
+            if module_enabled:
+                self.logger.info(f"测试模块 {module_name} 已启用")
+            else:
+                self.logger.debug(f"测试模块 {module_name} 已禁用（无匹配的测试用例）")
             
             # 同步更新CANoeTestModule对象的enabled属性
             for test_module in self.test_modules:
@@ -755,7 +773,11 @@ class CANoeInterface:
                     test_module.enabled = tm.Enabled
                     break
         
-        self.logger.info(f"已选择 {len(case_names)} 个测试用例")
+        self.logger.info(f"测试用例选择完成: 总共 {total_test_cases} 个测试用例，启用了 {enabled_count} 个")
+        
+        if enabled_count == 0:
+            self.logger.warning("警告: 没有测试用例被启用！请检查测试用例名称是否正确匹配")
+            self.logger.info(f"期望启用的测试用例: {case_names}")
     
     def get_test_summary(self) -> Dict[str, Any]:
         """
