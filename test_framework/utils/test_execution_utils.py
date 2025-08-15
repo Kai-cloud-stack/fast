@@ -136,20 +136,29 @@ def execute_multi_tse_workflow(config: Dict[str, Any], task_config_path: str = N
         
         logging.info("环境检查通过，开始执行多TSE文件测试")
         
-        # 清理环境检查使用的CANoe对象
-        canoe_obj.cleanup()
-        
-        # 创建多TSE执行器，传入已加载的配置
-        executor = MultiTSEExecutor(config=config)
+        # 创建多TSE执行器，传入已加载的配置和已创建的CANoe对象
+        # 这样避免重复创建CANoe接口，确保环境检查和TSE执行共享同一个main_config
+        executor = MultiTSEExecutor(config=config, canoe_interface=canoe_obj)
         
         # 如果提供了task_config_path，将其添加到配置中
         if task_config_path:
             executor.config['task_config_path'] = task_config_path
             logging.info(f"设置任务配置文件路径: {task_config_path}")
         
-        return executor.execute()
+        result = executor.execute()
+        
+        # 执行完成后清理CANoe对象
+        canoe_obj.cleanup()
+        
+        return result
+        
     except Exception as e:
         logging.error(f"多TSE执行工作流程失败: {e}")
+        # 确保在异常情况下也清理CANoe对象
+        try:
+            canoe_obj.cleanup()
+        except:
+            pass
         return False
 
 

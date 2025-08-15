@@ -25,13 +25,14 @@ from ..utils.logging_system import get_logger
 class MultiTSEExecutor:
     """多TSE文件执行器"""
     
-    def __init__(self, config_file: str = None, config: Dict[str, Any] = None):
+    def __init__(self, config_file: str = None, config: Dict[str, Any] = None, canoe_interface=None):
         """
         初始化多TSE执行器
         
         Args:
             config_file: 配置文件路径（已弃用，保留向后兼容性）
             config: 已加载的配置字典（推荐使用）
+            canoe_interface: 已创建的CANoeInterface对象（可选，避免重复创建）
         """
         self.logger = get_logger(__name__)
         
@@ -46,7 +47,14 @@ class MultiTSEExecutor:
             self.config = self._load_config()
             self.logger.info(f"从文件加载配置: {self.config_file}")
             
-        self.canoe_interface = None
+        # 使用传入的CANoeInterface对象或稍后创建
+        self.canoe_interface = canoe_interface
+        if canoe_interface is not None:
+            self.logger.info("使用传入的CANoeInterface对象，避免重复创建")
+            self._external_canoe_interface = True  # 标记为外部传入的接口
+        else:
+            self._external_canoe_interface = False  # 标记为内部创建的接口
+        
         self.notification_service = None
         self.execution_start_time = None
         self.execution_end_time = None
@@ -112,13 +120,20 @@ class MultiTSEExecutor:
             bool: 初始化是否成功
         """
         try:
-            # 初始化CANoe接口
-            self.logger.info("初始化CANoe接口...")
-            self.canoe_interface = CANoeInterface(self.config)
-            
-            if not self.canoe_interface.is_connected:
-                self.logger.error("CANoe接口初始化失败")
-                return False
+            # 初始化CANoe接口（如果尚未提供）
+            if self.canoe_interface is None:
+                self.logger.info("初始化CANoe接口...")
+                self.canoe_interface = CANoeInterface(self.config)
+                
+                if not self.canoe_interface.is_connected:
+                    self.logger.error("CANoe接口初始化失败")
+                    return False
+            else:
+                self.logger.info("使用已提供的CANoe接口对象")
+                # 验证已提供的CANoe接口是否连接正常
+                if not self.canoe_interface.is_connected:
+                    self.logger.error("提供的CANoe接口未连接")
+                    return False
             
             # 初始化通知服务
             self.logger.info("初始化通知服务...")
@@ -363,8 +378,9 @@ class MultiTSEExecutor:
             return False
         
         finally:
-            # 清理资源
-            if self.canoe_interface:
+            # 清理资源（仅清理自己创建的CANoe接口）
+            # 如果CANoe接口是外部传入的，由外部负责清理
+            if self.canoe_interface and not self._external_canoe_interface:
                 self.canoe_interface.cleanup()
     
     def _print_execution_summary(self, summary: Dict[str, Any]) -> None:
