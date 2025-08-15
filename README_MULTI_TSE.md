@@ -1,0 +1,344 @@
+# CANoe多TSE文件顺序执行功能
+
+## 概述
+
+本功能扩展了原有的CANoe测试框架，支持按顺序执行多个TSE（Test Setup Environment）文件，并在所有测试完成后汇总结果并发送邮件通知。
+
+## 主要特性
+
+- ✅ **多TSE文件支持**: 支持配置和执行多个TSE文件
+- ✅ **顺序执行**: 按配置顺序依次执行每个TSE文件
+- ✅ **结果汇总**: 自动汇总所有TSE文件的测试结果
+- ✅ **多格式输出**: 支持Excel、CSV、JSON、HTML等多种格式的结果输出
+- ✅ **邮件通知**: 执行完成后自动发送详细的测试结果邮件
+- ✅ **向后兼容**: 完全兼容原有的单TSE文件执行方式
+- ✅ **详细报告**: 生成包含统计信息和详细结果的HTML报告
+- ✅ **错误处理**: 完善的错误处理和日志记录
+
+## 文件结构
+
+```
+CANoe_py/
+├── test_framework/
+│   └── interfaces/
+│       └── canoe_interface.py          # 修改后的CANoe接口，支持多TSE
+├── config/
+│   └── multi_tse_config.json          # 多TSE配置文件示例
+├── multi_tse_main.py                  # 完整的多TSE执行主程序
+├── quick_multi_tse_example.py         # 快速使用示例
+├── multi_tse_example.py               # 详细使用示例
+└── README_MULTI_TSE.md               # 本说明文档
+```
+
+## 快速开始
+
+### 1. 配置文件准备
+
+创建或修改配置文件，将`tse_path`改为列表格式：
+
+```json
+{
+  "canoe": {
+    "project_path": "C:/CANoe_Projects/MyProject.cfg",
+    "tse_path": [
+      "C:/CANoe_Projects/TestEnvironments/Test1.tse",
+      "C:/CANoe_Projects/TestEnvironments/Test2.tse",
+      "C:/CANoe_Projects/TestEnvironments/Test3.tse"
+    ],
+    "canoe_exe_path": "C:/Program Files/Vector CANoe 16.0/Exec64/CANoe64.exe"
+  }
+}
+```
+
+### 2. 使用完整主程序
+
+```bash
+# 使用默认配置文件
+python3 multi_tse_main.py
+
+# 使用指定配置文件
+python3 multi_tse_main.py config/my_multi_tse_config.json
+
+# 启用详细日志
+python3 multi_tse_main.py --verbose
+```
+
+### 3. 使用快速示例
+
+```bash
+python3 quick_multi_tse_example.py
+```
+
+## 详细使用说明
+
+### 配置文件格式
+
+完整的配置文件示例请参考 `config/multi_tse_config.json`，主要包含以下部分：
+
+#### CANoe配置
+```json
+"canoe": {
+  "project_path": "CANoe项目文件路径",
+  "tse_path": ["TSE文件路径列表"],
+  "canoe_exe_path": "CANoe可执行文件路径",
+  "timeout": 300,
+  "auto_start_measurement": true
+}
+```
+
+#### 邮件通知配置
+```json
+"notification": {
+  "email": {
+    "enabled": true,
+    "smtp_server": "smtp.example.com",
+    "smtp_port": 587,
+    "username": "your_email@example.com",
+    "password": "your_password",
+    "sender": "CANoe测试系统 <canoe@example.com>",
+    "recipients": ["recipient@example.com"],
+    "subject_template": "CANoe多TSE测试结果 - {project_name}"
+  }
+}
+```
+
+#### 输出配置
+```json
+"output": {
+  "base_directory": "output",
+  "timestamp_folders": true,
+  "formats": {
+    "excel": true,
+    "csv": true,
+    "json": true,
+    "html_report": true
+  }
+}
+```
+
+### 编程接口使用
+
+#### 基本用法
+
+```python
+from test_framework.interfaces.canoe_interface import CANoeInterface
+from test_framework.services.notification_service import NotificationService
+
+# 加载配置
+config = {
+    "canoe": {
+        "project_path": "C:/CANoe_Projects/MyProject.cfg",
+        "tse_path": [
+            "C:/CANoe_Projects/Test1.tse",
+            "C:/CANoe_Projects/Test2.tse"
+        ]
+    },
+    "notification": {
+        "email": {
+            "enabled": True,
+            # ... 邮件配置
+        }
+    }
+}
+
+# 创建CANoe接口
+canoe_interface = CANoeInterface(config)
+
+# 启动测量
+canoe_interface.start_measurement()
+
+# 执行多TSE文件
+summary = canoe_interface.run_multiple_tse_files()
+
+# 获取合并的测试结果
+combined_df = canoe_interface.get_combined_test_results_dataframe()
+
+# 发送邮件通知
+notification_service = NotificationService(config['notification'])
+canoe_interface.send_summary_email(summary, notification_service)
+
+# 停止测量和清理
+canoe_interface.stop_measurement()
+canoe_interface.cleanup()
+```
+
+#### 高级用法
+
+```python
+# 单独加载和执行特定TSE文件
+canoe_interface.load_test_setup("C:/CANoe_Projects/SpecificTest.tse")
+results = canoe_interface.run_tests()
+
+# 获取特定TSE的结果
+for i, tse_path in enumerate(canoe_interface.tse_paths):
+    if i < len(canoe_interface.all_test_results):
+        tse_results = canoe_interface.all_test_results[i]
+        print(f"TSE {i+1} ({tse_path}): {len(tse_results)} 个测试结果")
+```
+
+## 输出结果
+
+### 文件输出
+
+执行完成后，会在输出目录生成以下文件：
+
+```
+output/
+└── multi_tse_execution_20231201_143022/
+    ├── combined_test_results.xlsx      # Excel格式的合并结果
+    ├── combined_test_results.csv       # CSV格式的合并结果
+    ├── test_execution_summary.json     # JSON格式的执行摘要
+    └── test_execution_report.html      # HTML格式的详细报告
+```
+
+### 邮件通知
+
+邮件包含以下内容：
+- 执行概况（TSE文件数量、测试用例统计）
+- 各TSE文件的详细结果
+- 总体通过率和统计信息
+- 附件（Excel结果文件）
+
+### 控制台输出
+
+```
+多TSE文件执行摘要
+============================================================
+执行时间: 2023-12-01 14:30:22 - 2023-12-01 14:45:18
+总耗时: 896.45 秒
+
+TSE文件执行情况:
+  总数: 3
+  成功: 3
+  失败: 0
+
+总体测试结果:
+  总测试用例: 45
+  通过: 42
+  失败: 2
+  跳过: 1
+  通过率: 93.33%
+
+各TSE文件详细结果:
+  1. C:/CANoe_Projects/Test1.tse
+     测试用例: 15 | 通过: 14 | 失败: 1 | 跳过: 0 | 通过率: 93.33%
+  2. C:/CANoe_Projects/Test2.tse
+     测试用例: 20 | 通过: 19 | 失败: 1 | 跳过: 0 | 通过率: 95.00%
+  3. C:/CANoe_Projects/Test3.tse
+     测试用例: 10 | 通过: 9 | 失败: 0 | 跳过: 1 | 通过率: 90.00%
+============================================================
+```
+
+## API参考
+
+### CANoeInterface 新增方法
+
+#### `run_multiple_tse_files() -> Dict[str, Any]`
+按顺序执行所有配置的TSE文件并返回汇总结果。
+
+**返回值:**
+```python
+{
+    'total_tse_files': int,           # TSE文件总数
+    'completed_tse_files': int,       # 成功完成的TSE文件数
+    'failed_tse_files': int,          # 失败的TSE文件数
+    'overall_stats': {               # 总体统计
+        'total': int,
+        'passed': int,
+        'failed': int,
+        'skipped': int,
+        'pass_rate': float
+    },
+    'tse_results': [                 # 各TSE文件详细结果
+        {
+            'tse_index': int,
+            'tse_path': str,
+            'total': int,
+            'passed': int,
+            'failed': int,
+            'skipped': int,
+            'pass_rate': float
+        }
+    ]
+}
+```
+
+#### `get_combined_test_results_dataframe() -> pd.DataFrame`
+获取所有TSE文件的合并测试结果数据框。
+
+**返回值:** 包含以下列的DataFrame:
+- `TSE_File`: TSE文件路径
+- `TestModule`: 测试模块名
+- `TestGroup`: 测试组名
+- `TestCase`: 测试用例名
+- `TestResult`: 测试结果 (PASS/FAIL/SKIP)
+
+#### `send_summary_email(summary: Dict[str, Any], notification_service: NotificationService) -> bool`
+发送测试结果汇总邮件。
+
+**参数:**
+- `summary`: 测试结果汇总信息
+- `notification_service`: 通知服务实例
+
+**返回值:** 邮件发送是否成功
+
+## 向后兼容性
+
+新版本完全兼容原有的单TSE文件配置：
+
+```json
+// 原有格式（仍然支持）
+"canoe": {
+  "tse_path": "C:/CANoe_Projects/SingleTest.tse"
+}
+
+// 新格式
+"canoe": {
+  "tse_path": ["C:/CANoe_Projects/SingleTest.tse"]
+}
+```
+
+## 注意事项
+
+1. **TSE文件路径**: 确保所有TSE文件路径都是绝对路径且文件存在
+2. **执行顺序**: TSE文件将按照配置文件中的顺序依次执行
+3. **资源管理**: 每个TSE文件执行完成后会自动清理资源
+4. **错误处理**: 单个TSE文件执行失败不会影响后续文件的执行
+5. **邮件配置**: 确保SMTP服务器配置正确，否则邮件发送会失败
+6. **输出目录**: 输出目录会自动创建，建议定期清理旧的结果文件
+
+## 故障排除
+
+### 常见问题
+
+1. **TSE文件加载失败**
+   - 检查文件路径是否正确
+   - 确认文件是否存在且可读
+   - 验证TSE文件格式是否正确
+
+2. **邮件发送失败**
+   - 检查SMTP服务器配置
+   - 验证用户名和密码
+   - 确认网络连接正常
+
+3. **CANoe连接失败**
+   - 确认CANoe软件已安装
+   - 检查CANoe可执行文件路径
+   - 验证CANoe项目文件是否存在
+
+### 日志查看
+
+日志文件位于 `logs/` 目录下，包含详细的执行信息和错误信息。
+
+## 更新日志
+
+### v2.0.0 (2023-12-01)
+- ✅ 新增多TSE文件顺序执行功能
+- ✅ 新增结果汇总和合并功能
+- ✅ 新增HTML报告生成
+- ✅ 改进邮件通知功能
+- ✅ 保持向后兼容性
+
+## 技术支持
+
+如有问题或建议，请联系开发团队或查看项目文档。

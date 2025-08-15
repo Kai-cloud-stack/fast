@@ -209,11 +209,16 @@ class CANoeInterface:
         # 从配置中获取参数
         # 从main_config的canoe配置中获取CANoe配置文件路径
         self.project_path = canoe_config['canoe'].get('base_path', '')
-        # 从main_config的canoe配置中获取测试环境文件路径
-        self.tse_path = canoe_config['canoe'].get('tse_path', '')
+        # 从main_config的canoe配置中获取测试环境文件路径（支持单个或多个）
+        tse_config = canoe_config['canoe'].get('tse_path', '')
+        if isinstance(tse_config, list):
+            self.tse_paths = tse_config
+        else:
+            self.tse_paths = [tse_config] if tse_config else []
         self.config_path = canoe_config['canoe'].get('configuration_path', '')
         self.test_results: List[TestCaseResult] = []
         self.test_modules: List[CANoeTestModule] = []
+        self.all_test_results: List[List[TestCaseResult]] = []  # 存储所有tse的测试结果
         
         # CANoe对象
         self.app = None
@@ -261,12 +266,14 @@ class CANoeInterface:
             if self.config_path and not self._load_configuration():
                 self.logger.warning("CANoe配置文件加载失败，将使用默认配置")
             
-            # 5. 自动加载测试设置
-            if self.tse_path:
-                if self.load_test_setup():
+            # 5. 自动加载测试设置（如果只有一个tse文件）
+            if len(self.tse_paths) == 1:
+                if self.load_test_setup(self.tse_paths[0]):
                     self.logger.info("测试设置自动加载成功")
                 else:
                     self.logger.warning("测试设置自动加载失败")
+            elif len(self.tse_paths) > 1:
+                self.logger.info(f"检测到{len(self.tse_paths)}个tse文件，将在运行时按顺序加载")
             
             self.is_connected = True
             self.logger.info("CANoe接口初始化成功")
@@ -309,8 +316,10 @@ class CANoeInterface:
         if self.config_path and not os.path.exists(self.config_path):
             self.logger.warning(f"CANoe配置文件不存在: {self.config_path}")
         
-        if self.tse_path and not os.path.exists(self.tse_path):
-            self.logger.warning(f"测试环境文件不存在: {self.tse_path}")
+        # 验证所有tse路径
+        for tse_path in self.tse_paths:
+            if tse_path and not os.path.exists(tse_path):
+                self.logger.warning(f"测试环境文件不存在: {tse_path}")
         
         return True
     
@@ -513,8 +522,12 @@ class CANoeInterface:
             self.logger.error(f"加载配置文件失败: {e}")
             return False
     
-    def load_test_setup(self) -> bool:
-        """加载测试设置
+    def load_test_setup(self, tse_path: str = None) -> bool:
+        """
+        加载测试设置
+        
+        Args:
+            tse_path: 测试环境文件路径，如果为None则使用第一个配置的路径
         
         Returns:
             bool: 加载是否成功
@@ -523,12 +536,18 @@ class CANoeInterface:
             self.logger.error("CANoe配置未加载")
             return False
             
+        if tse_path is None:
+            if not self.tse_paths:
+                self.logger.error("未配置测试环境文件路径")
+                return False
+            tse_path = self.tse_paths[0]
+            
         try:
             self.test_setup = self.app.Configuration.TestSetup
-            tse_path = os.path.join(self.config_path, self.tse_path)
+            full_tse_path = os.path.join(self.config_path, tse_path) if self.config_path else tse_path
             
             # 检查测试环境是否已存在
-            test_env = self._find_or_add_test_environment(tse_path)
+            test_env = self._find_or_add_test_environment(full_tse_path)
             if test_env is None:
                 return False
                 
@@ -538,7 +557,7 @@ class CANoeInterface:
             self.test_modules = []
             self._traverse_test_items(test_env, lambda tm: self.test_modules.append(CANoeTestModule(tm)))
             
-            self.logger.info(f"已加载 {len(self.test_modules)} 个测试模块")
+            self.logger.info(f"已加载 {len(self.test_modules)} 个测试模块 (来自 {tse_path})")
             return True
             
         except Exception as e:
@@ -705,7 +724,7 @@ class CANoeInterface:
                 
                 # 检查是否匹配指定的测试用例
                 for case_name in case_names:
-                    if case_name in test_item.Name:
+                    if case_name== test_item.Name:
                         test_item.Enabled = 1
                         module_enabled = True
                         self.logger.info(f"启用测试用例: {test_item.Name}")
@@ -738,6 +757,171 @@ class CANoeInterface:
         }
     
 
+    def run_multiple_tse_files(self) -> Dict[str, Any]:
+        """
+        按顺序运行多个tse文件并汇总结果
+        
+        Returns:
+            Dict: 包含所有测试结果的汇总信息
+        """
+        if not self.tse_paths:
+            self.logger.error("未配置测试环境文件路径")
+            return {}
+            
+        self.logger.info(f"开始按顺序运行 {len(self.tse_paths)} 个tse文件")
+        self.all_test_results.clear()
+        
+        overall_summary = {
+            'total_tse_files': len(self.tse_paths),
+            'completed_tse_files': 0,
+            'failed_tse_files': 0,
+            'tse_results': [],
+            'overall_stats': {
+                'total': 0,
+                'passed': 0,
+                'failed': 0,
+                'skipped': 0,
+                'pass_rate': 0.0
+            }
+        }
+        
+        for i, tse_path in enumerate(self.tse_paths, 1):
+            self.logger.info(f"运行第 {i}/{len(self.tse_paths)} 个tse文件: {tse_path}")
+            
+            try:
+                # 清理之前的测试结果和模块
+                self.test_results.clear()
+                self.test_modules.clear()
+                
+                # 加载当前tse文件
+                if not self.load_test_setup(tse_path):
+                    self.logger.error(f"加载tse文件失败: {tse_path}")
+                    overall_summary['failed_tse_files'] += 1
+                    continue
+                
+                # 运行测试
+                test_df = self.run_test_modules()
+                
+                # 获取当前tse的测试摘要
+                tse_summary = self.get_test_summary()
+                tse_summary['tse_path'] = tse_path
+                tse_summary['tse_index'] = i
+                
+                # 保存当前tse的测试结果
+                current_results = self.test_results.copy()
+                self.all_test_results.append(current_results)
+                
+                # 更新总体统计
+                overall_summary['overall_stats']['total'] += tse_summary['total']
+                overall_summary['overall_stats']['passed'] += tse_summary['passed']
+                overall_summary['overall_stats']['failed'] += tse_summary['failed']
+                overall_summary['overall_stats']['skipped'] += tse_summary['skipped']
+                
+                overall_summary['tse_results'].append(tse_summary)
+                overall_summary['completed_tse_files'] += 1
+                
+                self.logger.info(f"tse文件 {tse_path} 运行完成: {tse_summary}")
+                
+            except Exception as e:
+                self.logger.error(f"运行tse文件失败 {tse_path}: {e}")
+                overall_summary['failed_tse_files'] += 1
+        
+        # 计算总体通过率
+        total_tests = overall_summary['overall_stats']['total']
+        if total_tests > 0:
+            overall_summary['overall_stats']['pass_rate'] = (
+                overall_summary['overall_stats']['passed'] / total_tests * 100
+            )
+        
+        self.logger.info(f"所有tse文件运行完成，总体结果: {overall_summary['overall_stats']}")
+        return overall_summary
+    
+    def get_combined_test_results_dataframe(self) -> pd.DataFrame:
+        """
+        获取所有tse文件的合并测试结果数据框
+        
+        Returns:
+            pd.DataFrame: 合并的测试结果数据框
+        """
+        if not self.all_test_results:
+            return pd.DataFrame()
+        
+        all_data = []
+        for tse_index, results in enumerate(self.all_test_results, 1):
+            tse_path = self.tse_paths[tse_index - 1] if tse_index <= len(self.tse_paths) else f"TSE_{tse_index}"
+            
+            for result in results:
+                all_data.append([
+                    tse_path,
+                    result.test_module,
+                    result.test_group,
+                    result.test_case,
+                    result.result.name
+                ])
+        
+        df = pd.DataFrame(all_data, columns=['TSE_File', 'TestModule', 'TestGroup', 'TestCase', 'TestResult'])
+        self.logger.info(f"生成合并测试结果报告，共 {len(df)} 条记录")
+        return df
+    
+    def send_summary_email(self, summary: Dict[str, Any], notification_service=None) -> bool:
+        """
+        发送测试结果汇总邮件
+        
+        Args:
+            summary: 测试结果汇总信息
+            notification_service: 通知服务实例
+            
+        Returns:
+            bool: 发送是否成功
+        """
+        if not notification_service:
+            self.logger.warning("未提供通知服务，跳过邮件发送")
+            return False
+        
+        try:
+            # 构建邮件内容
+            subject = f"CANoe多TSE测试结果汇总 - {summary['completed_tse_files']}/{summary['total_tse_files']}个文件完成"
+            
+            body = f"""
+            CANoe多TSE文件测试执行完成
+            
+            执行概况:
+            - 总TSE文件数: {summary['total_tse_files']}
+            - 成功完成: {summary['completed_tse_files']}
+            - 执行失败: {summary['failed_tse_files']}
+            
+            总体测试结果:
+            - 总测试用例: {summary['overall_stats']['total']}
+            - 通过: {summary['overall_stats']['passed']}
+            - 失败: {summary['overall_stats']['failed']}
+            - 跳过: {summary['overall_stats']['skipped']}
+            - 通过率: {summary['overall_stats']['pass_rate']:.2f}%
+            
+            各TSE文件详细结果:
+            """
+            
+            for tse_result in summary['tse_results']:
+                body += f"""
+            
+            TSE文件 {tse_result['tse_index']}: {tse_result['tse_path']}
+            - 测试用例: {tse_result['total']}
+            - 通过: {tse_result['passed']}
+            - 失败: {tse_result['failed']}
+            - 跳过: {tse_result['skipped']}
+            - 通过率: {tse_result['pass_rate']:.2f}%
+                """
+            
+            # 发送邮件
+            return notification_service.send_email(
+                subject=subject,
+                body=body,
+                test_results=summary
+            )
+            
+        except Exception as e:
+            self.logger.error(f"发送汇总邮件失败: {e}")
+            return False
+    
     def cleanup(self) -> None:
         """清理资源"""
         if self.is_connected:

@@ -1,0 +1,79 @@
+{
+  "project_info": {
+    "name": "CANoe多TSE测试项目",
+    "version": "1.0.0",
+    "description": "支持多个TSE文件顺序执行的CANoe测试项目"
+  },
+  "canoe": {
+    "base_path": "/path/to/your/canoe/project",
+    "configuration_path": "/path/to/your/canoe/config.cfg",
+    "tse_path": [
+      "test_environments/basic_functionality.tse",
+      "test_environments/network_communication.tse",
+      "test_environments/error_handling.tse",
+      "test_environments/performance_tests.tse",
+      "test_environments/regression_tests.tse"
+    ],
+    "execution_settings": {
+      "stop_on_first_failure": false,
+      "generate_individual_reports": true,
+      "generate_combined_report": true
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "log_to_file": true,
+    "log_file_path": "logs/multi_tse_execution.log",
+    "max_log_size_mb": 100,
+    "backup_count": 5
+  },
+  "notification": {
+    "email": {
+      "enabled": true,
+      "smtp_server": "smtp.company.com",
+      "smtp_port": 587,
+      "username": "canoe_test@company.com",
+      "password": "your_email_password",
+      "from_email": "canoe_test@company.com",
+      "to_emails": [
+        "test_manager@company.com",
+        "development_team@company.com",
+        "qa_team@company.com"
+      ],
+      "cc_emails": [
+        "project_manager@company.com"
+      ],
+      "use_tls": true,
+      "send_on_completion": true,
+      "send_on_failure": true,
+      "include_detailed_results": true
+    },
+    "wechat_robot": {
+      "enabled": false,
+      "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=your_webhook_key",
+      "send_summary_only": true
+    }
+  },
+  "output": {
+    "base_directory": "output",
+    "timestamp_folders": true,
+    "formats": {
+      "excel": true,
+      "csv": true,
+      "json": true,
+      "html_report": true
+    },
+    "file_naming": {
+      "combined_results": "combined_test_results",
+      "individual_tse_prefix": "tse_results_",
+      "summary_report": "test_execution_summary"
+    }
+  },
+  "test_execution": {
+    "timeout_per_tse_minutes": 60,
+    "retry_failed_tse": false,
+    "max_retries": 1,
+    "delay_between_tse_seconds": 5,
+    "cleanup_between_tse": true
+  }
+}
