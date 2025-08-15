@@ -87,7 +87,15 @@ def perform_environment_check(canoe_obj: CANoeInterface, config: Dict[str, Any] 
         tester.check_environment()
         env_results = tester.get_check_results()
         
-        is_ready = check_environment_result(env_results)
+        # 从环境检查结果中提取实际的测试结果列表
+        if env_results.get('result') == 'pass':
+            # 如果环境检查通过，检查具体的测试结果
+            actual_test_results = env_results.get('env_check_results', [])
+            is_ready = check_environment_result(actual_test_results)
+        else:
+            # 如果环境检查本身就失败了，直接返回False
+            logging.error(f"环境检查失败: {env_results.get('error_message', '未知错误')}")
+            is_ready = False
         
         if is_ready:
             logging.info("环境检查通过")
