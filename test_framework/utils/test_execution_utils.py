@@ -109,27 +109,20 @@ def perform_environment_check(canoe_obj: CANoeInterface, config: Dict[str, Any] 
         return False
 
 
-def execute_multi_tse_workflow(config_file: str = None, task_config_path: str = None) -> bool:
+def execute_multi_tse_workflow(config: Dict[str, Any], task_config_path: str = None) -> bool:
     """
     执行多TSE文件测试工作流程的便捷函数
     
     Args:
-        config_file: 配置文件路径，默认使用main_config.json
+        config: 已加载的主配置字典
         task_config_path: 任务配置文件路径，用于根据TSE名称匹配测试用例
     
     Returns:
         bool: 执行是否成功
     """
     from ..executors.multi_tse_executor import MultiTSEExecutor
-    from .common_utils import load_main_config
     
     try:
-        # 加载配置
-        if config_file:
-            config = load_main_config(config_file)
-        else:
-            config = load_main_config()
-        
         # 创建CANoe接口对象进行环境检查
         canoe_obj = CANoeInterface(config)
         
@@ -147,8 +140,8 @@ def execute_multi_tse_workflow(config_file: str = None, task_config_path: str = 
         # 清理环境检查使用的CANoe对象
         canoe_obj.cleanup()
         
-        # 创建多TSE执行器
-        executor = MultiTSEExecutor(config_file)
+        # 创建多TSE执行器，传入已加载的配置
+        executor = MultiTSEExecutor(config=config)
         
         # 如果提供了task_config_path，将其添加到配置中
         if task_config_path:
@@ -161,19 +154,20 @@ def execute_multi_tse_workflow(config_file: str = None, task_config_path: str = 
         return False
 
 
-def create_multi_tse_executor(config_file: str = None) -> 'MultiTSEExecutor':
+def create_multi_tse_executor(config_file: str = None, config: Dict[str, Any] = None) -> 'MultiTSEExecutor':
     """
     创建多TSE执行器实例的便捷函数
     
     Args:
-        config_file: 配置文件路径
+        config_file: 配置文件路径（已弃用，保留向后兼容性）
+        config: 已加载的配置字典（推荐使用）
     
     Returns:
         MultiTSEExecutor: 多TSE执行器实例
     """
     from ..executors.multi_tse_executor import MultiTSEExecutor
     
-    return MultiTSEExecutor(config_file)
+    return MultiTSEExecutor(config_file=config_file, config=config)
 
 
 def send_test_notification(config: Dict[str, Any], results_dict: Dict[str, Any], 

@@ -148,16 +148,19 @@ python3 temp_main.py --mode single --task-config test_framework/config/task_conf
 ```python
 from test_framework.executors.multi_tse_executor import MultiTSEExecutor
 from test_framework.utils.test_execution_utils import execute_multi_tse_workflow
+from test_framework.utils.common_utils import load_main_config
 
 # 方法1: 使用便捷函数
-success = execute_multi_tse_workflow('test_framework/config/main_config.json')
+config = load_main_config('test_framework/config/main_config.json')
+success = execute_multi_tse_workflow(config)
 if success:
     print("多TSE测试执行成功")
 else:
     print("多TSE测试执行失败")
 
 # 方法2: 直接使用MultiTSEExecutor
-executor = MultiTSEExecutor('test_framework/config/main_config.json')
+config = load_main_config('test_framework/config/main_config.json')
+executor = MultiTSEExecutor(config=config)
 summary = executor.execute_all_tse_files()
 print(f"执行完成，通过率: {summary['overall_stats']['pass_rate']:.2f}%")
 ```

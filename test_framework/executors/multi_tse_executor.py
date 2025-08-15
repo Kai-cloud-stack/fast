@@ -25,16 +25,27 @@ from ..utils.logging_system import get_logger
 class MultiTSEExecutor:
     """多TSE文件执行器"""
     
-    def __init__(self, config_file: str = None):
+    def __init__(self, config_file: str = None, config: Dict[str, Any] = None):
         """
         初始化多TSE执行器
         
         Args:
-            config_file: 配置文件路径
+            config_file: 配置文件路径（已弃用，保留向后兼容性）
+            config: 已加载的配置字典（推荐使用）
         """
         self.logger = get_logger(__name__)
-        self.config_file = config_file or 'test_framework/config/main_config.json'
-        self.config = self._load_config()
+        
+        # 优先使用传入的配置字典，避免重复加载
+        if config is not None:
+            self.config = config
+            self.config_file = None  # 不需要配置文件路径
+            self.logger.info("使用传入的配置字典")
+        else:
+            # 向后兼容：如果没有传入配置字典，则从文件加载
+            self.config_file = config_file or 'test_framework/config/main_config.json'
+            self.config = self._load_config()
+            self.logger.info(f"从文件加载配置: {self.config_file}")
+            
         self.canoe_interface = None
         self.notification_service = None
         self.execution_start_time = None

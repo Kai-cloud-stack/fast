@@ -34,10 +34,14 @@ def main(main_config_path: str, task_config_path: str = None, execution_mode: st
         execution_mode: 执行模式，'single'为单TSE模式，'multi'为多TSE模式
     """
     try:
+        # 一次性加载主配置，避免重复加载
+        logging.info(f"加载主配置文件: {main_config_path}")
+        config = load_main_config(main_config_path)
+        
         if execution_mode == 'multi':
             # 多TSE执行模式
             logging.info("开始执行多TSE文件测试")
-            success = execute_multi_tse_workflow(main_config_path, task_config_path)
+            success = execute_multi_tse_workflow(config, task_config_path)
             
             if success:
                 logging.info("多TSE文件测试执行完成")
@@ -51,9 +55,6 @@ def main(main_config_path: str, task_config_path: str = None, execution_mode: st
                 return
                 
             logging.info("开始执行单TSE文件测试")
-            
-            # 加载配置
-            config = load_main_config(main_config_path)
             
             # 验证配置
             if not validate_test_configuration(config, task_config_path):

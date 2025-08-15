@@ -75,7 +75,7 @@ def test_measurement_timing():
             'notification': config.get('notification', {})
         }
         
-        executor = MultiTSEExecutor(multi_tse_config)
+        executor = MultiTSEExecutor(config=multi_tse_config)
         
         # 执行测试（内部会调用run_multiple_tse_files with measurement_started=False）
         logger.info("执行MultiTSEExecutor测试...")
