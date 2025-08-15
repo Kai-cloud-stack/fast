@@ -729,6 +729,7 @@ class CANoeInterface:
             
         test_env = self.app.Configuration.TestSetup.TestEnvironments.Item(1)
         test_modules = [CastTo(item, 'ITSTestModule2') for item in test_env.Items]
+        test_env.Enabled = True
         
         for tm in test_modules:
             module_enabled = False
