@@ -1,37 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-多TSE文件顺序执行主程序
-Multiple TSE Files Sequential Execution Main Program
+多TSE文件顺序执行器
+Multiple TSE Files Sequential Executor
 
-本程序实现了多个TSE文件的顺序执行功能，包括：
+本模块实现了多个TSE文件的顺序执行功能，包括：
 1. 从配置文件加载多个TSE路径
 2. 按顺序执行所有TSE文件
 3. 汇总所有测试结果
 4. 生成详细报告
 5. 发送邮件通知
-
-使用方法:
-    python3 multi_tse_main.py [config_file]
-    
-参数:
-    config_file: 配置文件路径（可选，默认使用config/multi_tse_config.json）
 """
 
-import sys
 import json
-import argparse
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List
 
-# 添加项目根目录到Python路径
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
-
-from test_framework.interfaces.canoe_interface import CANoeInterface
-from test_framework.services.notification_service import NotificationService
-from test_framework.utils.logging_system import get_logger
+from ..interfaces.canoe_interface import CANoeInterface
+from ..services.notification_service import NotificationService
+from ..utils.logging_system import get_logger
 
 
 class MultiTSEExecutor:
@@ -45,7 +33,7 @@ class MultiTSEExecutor:
             config_file: 配置文件路径
         """
         self.logger = get_logger(__name__)
-        self.config_file = config_file or 'config/multi_tse_config.json'
+        self.config_file = config_file or 'test_framework/config/main_config.json'
         self.config = self._load_config()
         self.canoe_interface = None
         self.notification_service = None
@@ -92,11 +80,12 @@ class MultiTSEExecutor:
         
         # 验证CANoe配置
         canoe_config = self.config['canoe']
-        if 'tse_path' not in canoe_config:
-            self.logger.error("配置文件缺少tse_path配置")
+        if 'tse_paths' not in canoe_config and 'tse_path' not in canoe_config:
+            self.logger.error("配置文件缺少tse_paths配置")
             return False
         
-        tse_paths = canoe_config['tse_path']
+        # 支持新旧配置格式
+        tse_paths = canoe_config.get('tse_paths', canoe_config.get('tse_path', []))
         if not isinstance(tse_paths, list) or len(tse_paths) == 0:
             self.logger.error("tse_path必须是非空列表")
             return False
@@ -362,7 +351,13 @@ class MultiTSEExecutor:
             
             # 5. 执行多TSE文件
             self.logger.info("开始执行多TSE文件...")
-            summary = self.canoe_interface.run_multiple_tse_files()
+            
+            # 获取任务配置文件路径（如果配置中有的话）
+            task_config_path = self.config.get('task_config_path')
+            if task_config_path:
+                self.logger.info(f"使用任务配置文件: {task_config_path}")
+            
+            summary = self.canoe_interface.run_multiple_tse_files(task_config_path)
             
             if not summary:
                 self.logger.error("多TSE文件执行失败")
@@ -437,41 +432,3 @@ class MultiTSEExecutor:
             print(f"     测试用例: {tse_result['total']} | 通过: {tse_result['passed']} | 失败: {tse_result['failed']} | 跳过: {tse_result['skipped']} | 通过率: {tse_result['pass_rate']:.2f}%")
         
         print("="*60)
-
-
-def main():
-    """主函数"""
-    parser = argparse.ArgumentParser(description='多TSE文件顺序执行程序')
-    parser.add_argument(
-        'config_file',
-        nargs='?',
-        default='config/multi_tse_config.json',
-        help='配置文件路径（默认: config/multi_tse_config.json）'
-    )
-    parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='启用详细日志输出'
-    )
-    
-    args = parser.parse_args()
-    
-    try:
-        # 创建执行器并运行
-        executor = MultiTSEExecutor(args.config_file)
-        success = executor.execute()
-        
-        if success:
-            print("\n✅ 多TSE文件顺序执行成功完成")
-            sys.exit(0)
-        else:
-            print("\n❌ 多TSE文件顺序执行失败")
-            sys.exit(1)
-            
-    except Exception as e:
-        print(f"\n❌ 程序执行失败: {e}")
-        sys.exit(1)
-
-
-if __name__ == '__main__':
-    main()

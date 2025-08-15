@@ -8,6 +8,7 @@
 
 - ✅ **多TSE文件支持**: 支持配置和执行多个TSE文件
 - ✅ **顺序执行**: 按配置顺序依次执行每个TSE文件
+- ✅ **智能测试用例匹配**: 根据TSE文件名自动匹配对应的测试用例组
 - ✅ **结果汇总**: 自动汇总所有TSE文件的测试结果
 - ✅ **多格式输出**: 支持Excel、CSV、JSON、HTML等多种格式的结果输出
 - ✅ **邮件通知**: 执行完成后自动发送详细的测试结果邮件
@@ -20,66 +21,94 @@
 ```
 CANoe_py/
 ├── test_framework/
-│   └── interfaces/
-│       └── canoe_interface.py          # 修改后的CANoe接口，支持多TSE
+│   ├── executors/
+│   │   └── multi_tse_executor.py       # 多TSE执行器
+│   ├── interfaces/
+│   │   └── canoe_interface.py          # 修改后的CANoe接口，支持多TSE
+│   └── utils/
+│       └── test_execution_utils.py     # 包含多TSE执行工具函数
 ├── config/
-│   └── multi_tse_config.json          # 多TSE配置文件示例
-├── multi_tse_main.py                  # 完整的多TSE执行主程序
-├── quick_multi_tse_example.py         # 快速使用示例
-├── multi_tse_example.py               # 详细使用示例
-└── README_MULTI_TSE.md               # 本说明文档
+│   └── main_config.json                # 主配置文件（包含TSE路径配置）
+├── temp_main.py                        # 主程序入口（集成多TSE功能）
+└── README_MULTI_TSE.md                # 本说明文档
+```
+
+## TSE名称与测试用例匹配
+
+### 匹配规则
+
+系统会根据TSE文件名自动匹配对应的测试用例组：
+
+- TSE文件名包含 `Diag` → 匹配 `testcases_Diag` 测试用例组
+- TSE文件名包含 `Can` → 匹配 `testcases_Can` 测试用例组
+- 其他情况 → 使用默认的 `test_cases` 测试用例组
+
+### 示例
+
+```
+TSE文件: "Test_Diag_Module1.tse" → 使用 testcases_Diag 中启用的测试用例
+TSE文件: "Test_Can_Module2.tse" → 使用 testcases_Can 中启用的测试用例
+TSE文件: "General_Test.tse" → 使用 test_cases 中启用的测试用例
 ```
 
 ## 快速开始
 
 ### 1. 配置文件准备
 
-创建或修改配置文件，将`tse_path`改为列表格式：
+创建或修改配置文件，将`tse_path`改为`tse_paths`列表格式：
 
 ```json
 {
   "canoe": {
     "project_path": "C:/CANoe_Projects/MyProject.cfg",
-    "tse_path": [
-      "C:/CANoe_Projects/TestEnvironments/Test1.tse",
-      "C:/CANoe_Projects/TestEnvironments/Test2.tse",
-      "C:/CANoe_Projects/TestEnvironments/Test3.tse"
+    "tse_paths": [
+      "C:/CANoe_Projects/TestEnvironments/Test_Diag_Module1.tse",
+      "C:/CANoe_Projects/TestEnvironments/Test_Can_Module2.tse",
+      "C:/CANoe_Projects/TestEnvironments/Test_Diag_Module3.tse"
     ],
     "canoe_exe_path": "C:/Program Files/Vector CANoe 16.0/Exec64/CANoe64.exe"
-  }
+  },
+  "task_config_path": "test_framework/config/task_config.json"
 }
 ```
 
-### 2. 使用完整主程序
+### 2. 使用主程序执行多TSE测试
 
 ```bash
-# 使用默认配置文件
-python3 multi_tse_main.py
+# 使用多TSE模式（默认配置文件）
+python3 temp_main.py --mode multi
 
-# 使用指定配置文件
-python3 multi_tse_main.py config/my_multi_tse_config.json
+# 使用多TSE模式并指定配置文件
+python3 temp_main.py --mode multi --config test_framework/config/main_config.json
 
 # 启用详细日志
-python3 multi_tse_main.py --verbose
+python3 temp_main.py --mode multi --verbose
 ```
 
-### 3. 使用快速示例
+### 3. 使用单TSE模式（原有功能）
 
 ```bash
-python3 quick_multi_tse_example.py
+# 使用单TSE模式（默认）
+python3 temp_main.py
+
+# 或明确指定单TSE模式
+python3 temp_main.py --mode single
+
+# 指定任务配置文件
+python3 temp_main.py --mode single --task-config test_framework/config/task_config.json
 ```
 
 ## 详细使用说明
 
 ### 配置文件格式
 
-完整的配置文件示例请参考 `config/multi_tse_config.json`，主要包含以下部分：
+完整的配置文件示例请参考 `test_framework/config/main_config.json`，主要包含以下部分：
 
 #### CANoe配置
 ```json
 "canoe": {
   "project_path": "CANoe项目文件路径",
-  "tse_path": ["TSE文件路径列表"],
+  "tse_paths": ["TSE文件路径列表"],
   "canoe_exe_path": "CANoe可执行文件路径",
   "timeout": 300,
   "auto_start_measurement": true
@@ -118,7 +147,26 @@ python3 quick_multi_tse_example.py
 
 ### 编程接口使用
 
-#### 基本用法
+#### 使用MultiTSEExecutor
+
+```python
+from test_framework.executors.multi_tse_executor import MultiTSEExecutor
+from test_framework.utils.test_execution_utils import execute_multi_tse_workflow
+
+# 方法1: 使用便捷函数
+success = execute_multi_tse_workflow('test_framework/config/main_config.json')
+if success:
+    print("多TSE测试执行成功")
+else:
+    print("多TSE测试执行失败")
+
+# 方法2: 直接使用MultiTSEExecutor
+executor = MultiTSEExecutor('test_framework/config/main_config.json')
+summary = executor.execute_all_tse_files()
+print(f"执行完成，通过率: {summary['overall_stats']['pass_rate']:.2f}%")
+```
+
+#### 使用CANoeInterface（底层接口）
 
 ```python
 from test_framework.interfaces.canoe_interface import CANoeInterface
@@ -128,7 +176,7 @@ from test_framework.services.notification_service import NotificationService
 config = {
     "canoe": {
         "project_path": "C:/CANoe_Projects/MyProject.cfg",
-        "tse_path": [
+        "tse_paths": [
             "C:/CANoe_Projects/Test1.tse",
             "C:/CANoe_Projects/Test2.tse"
         ]
@@ -292,9 +340,18 @@ TSE文件执行情况:
   "tse_path": "C:/CANoe_Projects/SingleTest.tse"
 }
 
-// 新格式
+// 新格式（推荐）
 "canoe": {
-  "tse_path": ["C:/CANoe_Projects/SingleTest.tse"]
+  "tse_paths": ["C:/CANoe_Projects/SingleTest.tse"]
+}
+
+// 多TSE文件格式
+"canoe": {
+  "tse_paths": [
+    "C:/CANoe_Projects/Test1.tse",
+    "C:/CANoe_Projects/Test2.tse",
+    "C:/CANoe_Projects/Test3.tse"
+  ]
 }
 ```
 
@@ -331,6 +388,23 @@ TSE文件执行情况:
 日志文件位于 `logs/` 目录下，包含详细的执行信息和错误信息。
 
 ## 更新日志
+
+### v2.2.0 (2024-12-19)
+- ✅ 新增TSE名称与测试用例智能匹配功能
+- ✅ 支持根据TSE文件名自动选择对应的测试用例组
+- ✅ 更新 `get_enabled_test_cases` 函数支持TSE名称参数
+- ✅ 新增 `get_testcase_group_from_tse_name` 函数
+- ✅ 修改 `run_multiple_tse_files` 方法支持任务配置
+- ✅ 更新多TSE执行器支持任务配置文件路径
+- ✅ 完善文档说明匹配规则和使用方法
+
+### v2.1.0 (2023-12-01)
+- ✅ 多TSE功能集成到主程序入口
+- ✅ 新增命令行参数支持（--mode, --config, --task-config, --verbose）
+- ✅ 统一单TSE和多TSE执行入口
+- ✅ 创建MultiTSEExecutor执行器类
+- ✅ 添加便捷函数到test_execution_utils
+- ✅ 移除独立的多TSE主程序文件
 
 ### v2.0.0 (2023-12-01)
 - ✅ 新增多TSE文件顺序执行功能

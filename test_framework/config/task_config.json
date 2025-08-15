@@ -7,7 +7,7 @@
         "timeout": 120,
         "use_package_manager": true
     },
-    "test_cases": [
+    "testcases_Diag": [
         {
             "name": "Test_SWDL",
             "enabled": false
@@ -116,5 +116,23 @@
             "name": "Test_Other",
             "enabled": true
         }
-    ]
+    ],
+    "testcases_Can": [
+    {
+        "name": "FrameCheckTest",
+        "enabled": true
+    },
+    {
+        "name": "SWTDmessagenormaltest",
+        "enabled": true
+    },
+    {
+        "name": "UnusedBitTest",
+        "enabled": true
+    },
+    {
+        "name": "CRCCheckTest",
+        "enabled": true
+    }
+]
 }

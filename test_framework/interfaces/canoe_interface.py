@@ -210,7 +210,7 @@ class CANoeInterface:
         # 从main_config的canoe配置中获取CANoe配置文件路径
         self.project_path = canoe_config['canoe'].get('base_path', '')
         # 从main_config的canoe配置中获取测试环境文件路径（支持单个或多个）
-        tse_config = canoe_config['canoe'].get('tse_path', '')
+        tse_config = canoe_config['canoe'].get('tse_paths', canoe_config['canoe'].get('tse_path', ''))
         if isinstance(tse_config, list):
             self.tse_paths = tse_config
         else:
@@ -757,9 +757,12 @@ class CANoeInterface:
         }
     
 
-    def run_multiple_tse_files(self) -> Dict[str, Any]:
+    def run_multiple_tse_files(self, task_config_path: str = None) -> Dict[str, Any]:
         """
         按顺序运行多个tse文件并汇总结果
+        
+        Args:
+            task_config_path: 任务配置文件路径，用于根据TSE名称匹配测试用例
         
         Returns:
             Dict: 包含所有测试结果的汇总信息
@@ -798,6 +801,29 @@ class CANoeInterface:
                     self.logger.error(f"加载tse文件失败: {tse_path}")
                     overall_summary['failed_tse_files'] += 1
                     continue
+                
+                # 根据TSE名称选择对应的测试用例
+                if task_config_path:
+                    from test_framework.utils.common_utils import load_task_config, get_enabled_test_cases
+                    import os
+                    
+                    try:
+                        # 获取TSE文件名（不含路径和扩展名）
+                        tse_name = os.path.splitext(os.path.basename(tse_path))[0]
+                        
+                        # 加载任务配置
+                        task_config = load_task_config(task_config_path)
+                        
+                        # 根据TSE名称获取对应的测试用例
+                        enabled_case_names = get_enabled_test_cases(task_config, tse_name)
+                        
+                        if enabled_case_names:
+                            self.logger.info(f"为TSE文件 {tse_name} 选择了 {len(enabled_case_names)} 个测试用例")
+                            self.select_test_cases(enabled_case_names)
+                        else:
+                            self.logger.warning(f"TSE文件 {tse_name} 没有找到匹配的测试用例")
+                    except Exception as e:
+                        self.logger.error(f"选择测试用例时发生错误: {e}，将运行所有启用的测试模块")
                 
                 # 运行测试
                 test_df = self.run_test_modules()
