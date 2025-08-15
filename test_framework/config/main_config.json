@@ -23,11 +23,7 @@
     "notification": {
         "email": {
             "enabled": true,
-            "smtp_server": "smtp.163.com",
-            "smtp_port": 587,
-            "username": "kai.ren@freetech.com",
-            "password": "your_email_password",
-            "sender": "CANoe测试系统 <kai.ren@freetech.com>",
+            "method": "outlook_com",
             "recipients": ["kai.ren@freetech.com", "linyang.zhang@freetech.com"],
             "subject_template": "CANoe多TSE测试结果 - {project_name}"
         }
