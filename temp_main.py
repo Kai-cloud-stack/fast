@@ -60,8 +60,12 @@ def main(main_config_path: str, task_config_path: str = None, execution_mode: st
                 logging.error("配置验证失败，终止执行")
                 return
             
+            # 创建CANoe接口对象
+            from test_framework.interfaces.canoe_interface import CANoeInterface
+            canoe_obj = CANoeInterface(config)
+            
             # 执行完整的测试工作流程
-            workflow_result = execute_complete_test_workflow(config, task_config_path)
+            workflow_result = execute_complete_test_workflow(canoe_obj, task_config_path, config)
             
             if workflow_result['success']:
                 logging.info("单TSE文件测试执行完成")
